@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
+from datetime import date, datetime
 
 from src.alerts.detector import run_alert_detection
 from src.analysis.llm_analyzer import analyze_pending_reviews
 from src.core.db import session_scope
 from src.etl.pipeline import run_etl
+from src.reports.weekly_report import generate_weekly_report
 from src.scripts.seed import seed_customer_surveys
 
 
@@ -26,8 +27,11 @@ def build_parser() -> argparse.ArgumentParser:
     alerts_parser = subparsers.add_parser("alerts", help="Run alert detection")
     alerts_parser.add_argument("--now", type=str, default=None, help="ISO-8601 UTC timestamp")
 
-    for command in ("report", "run-all"):
-        subparsers.add_parser(command)
+    report_parser = subparsers.add_parser("report", help="Generate weekly report")
+    report_parser.add_argument("--week-start", type=str, default=None, help="YYYY-MM-DD")
+
+    run_all_parser = subparsers.add_parser("run-all", help="Run ETL -> analysis -> alerts -> report")
+    run_all_parser.add_argument("--analyze-limit", type=int, default=100)
 
     return parser
 
@@ -73,6 +77,23 @@ def cmd_alerts(now: str | None) -> None:
     )
 
 
+def cmd_report(week_start: str | None) -> None:
+    week_start_dt = date.fromisoformat(week_start) if week_start else None
+    stats = generate_weekly_report(week_start=week_start_dt)
+    print(f"Report complete | html={stats.html_path} pdf={stats.pdf_path}")
+
+
+def cmd_run_all(analyze_limit: int) -> None:
+    print("Running ETL...")
+    cmd_etl(since=None)
+    print("Running analysis...")
+    cmd_analyze(limit=analyze_limit)
+    print("Running alerts...")
+    cmd_alerts(now=None)
+    print("Generating report...")
+    cmd_report(week_start=None)
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -93,7 +114,15 @@ def main() -> None:
         cmd_alerts(now=args.now)
         return
 
-    print(f"Command '{args.command}' is scaffolded and will be implemented in next commits.")
+    if args.command == "report":
+        cmd_report(week_start=args.week_start)
+        return
+
+    if args.command == "run-all":
+        cmd_run_all(analyze_limit=args.analyze_limit)
+        return
+
+    raise ValueError(f"Unsupported command: {args.command}")
 
 
 if __name__ == "__main__":
