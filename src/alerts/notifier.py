@@ -155,7 +155,7 @@ def build_alert_digest(
         actions.append("Sin acciones inmediatas; mantener monitoreo en siguiente corrida.")
 
     sections = [
-        "*FeedbackIQ | Digest de Alertas*",
+        "*BrewMaster | FeedbackIQ Digest de Alertas*",
         f"Fecha: {run_at.isoformat()}",
         "",
         "*Resumen del lote*",
