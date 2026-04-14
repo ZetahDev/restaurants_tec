@@ -33,18 +33,17 @@ def _utc_now(now: datetime | None = None) -> datetime:
 
 
 def _detect_critical(session: Session, now: datetime) -> list[AlertCandidate]:
-    since = now - timedelta(hours=24)
     stmt = (
         select(UnifiedReview, ReviewAnalysis)
         .join(ReviewAnalysis, ReviewAnalysis.unified_review_id == UnifiedReview.id)
-        .where(and_(ReviewAnalysis.urgency == 5, ReviewAnalysis.created_at >= since, ReviewAnalysis.created_at <= now))
+        .where(ReviewAnalysis.urgency == 5)
     )
     rows = session.execute(stmt).all()
 
     candidates: list[AlertCandidate] = []
     for review, analysis in rows:
-        event_start = analysis.created_at
-        event_end = analysis.created_at + timedelta(minutes=1)
+        event_start = review.created_at
+        event_end = review.created_at + timedelta(minutes=1)
         candidates.append(
             AlertCandidate(
                 severity="CRITICA",
@@ -67,8 +66,8 @@ def _detect_high(session: Session, now: datetime) -> list[AlertCandidate]:
         .where(
             and_(
                 ReviewAnalysis.sentiment == "negative",
-                ReviewAnalysis.created_at >= since,
-                ReviewAnalysis.created_at <= now,
+                UnifiedReview.created_at >= since,
+                UnifiedReview.created_at <= now,
             )
         )
         .group_by(UnifiedReview.location_id)
