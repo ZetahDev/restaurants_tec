@@ -41,6 +41,31 @@ def _alert_payload(alert: Alert) -> dict[str, str | int]:
     }
 
 
+def _critical_immediate_text(alerts: list[Alert], run_at: datetime) -> str:
+    critical_alerts = [alert for alert in alerts if alert.severity == "CRITICA"]
+    if not critical_alerts:
+        return ""
+
+    header = [
+        "*BrewMaster | ALERTA INMEDIATA CRITICA*",
+        f"Fecha: {run_at.isoformat()}",
+        f"Total criticas nuevas: {len(critical_alerts)}",
+        "",
+    ]
+    body = []
+    for alert in critical_alerts[:10]:
+        message = alert.message.strip()
+        if len(message) > 120:
+            message = f"{message[:117]}..."
+        body.append(f"- loc {alert.location_id} | {alert.rule_code}: {message}")
+
+    footer = [
+        "",
+        "Accion inmediata: escalar al responsable de turno y confirmar contencion en <15 min.",
+    ]
+    return "\n".join(header + body + footer)
+
+
 def _fallback_summary(
     alerts: list[Alert],
     generated: int,
@@ -201,6 +226,12 @@ def _write_fallback(payload: dict) -> NotificationResult:
     return NotificationResult(delivered_to="json_fallback", detail=str(fallback_file))
 
 
+def _send_slack_text(webhook_url: str, text: str) -> None:
+    with httpx.Client(timeout=10.0) as client:
+        response = client.post(webhook_url, json={"text": text})
+        response.raise_for_status()
+
+
 def notify_alert_digest(
     alerts: list[Alert],
     generated: int,
@@ -214,15 +245,41 @@ def notify_alert_digest(
         persisted=persisted,
         run_at=run_at,
     )
+    digest["meta"]["kind"] = "digest"
+
+    critical_text = _critical_immediate_text(alerts=alerts, run_at=run_at)
+    critical_payload = {
+        "text": critical_text,
+        "meta": {
+            "kind": "critical_immediate",
+            "critical_count": sum(1 for alert in alerts if alert.severity == "CRITICA"),
+            "generated": generated,
+            "persisted": persisted,
+        },
+    }
 
     if not settings.slack_webhook_url:
-        return _write_fallback(digest)
+        fallback_result = _write_fallback(digest)
+        if critical_text:
+            _write_fallback(critical_payload)
+        return fallback_result
 
     try:
-        with httpx.Client(timeout=10.0) as client:
-            response = client.post(settings.slack_webhook_url, json={"text": digest["text"]})
-            response.raise_for_status()
+        _send_slack_text(settings.slack_webhook_url, digest["text"])
+
+        if critical_text:
+            try:
+                _send_slack_text(settings.slack_webhook_url, critical_text)
+                return NotificationResult(delivered_to="slack", detail="digest_and_critical_sent")
+            except Exception as exc:
+                critical_payload["meta"]["notification_error"] = str(exc)
+                _write_fallback(critical_payload)
+                return NotificationResult(delivered_to="slack", detail="digest_sent_critical_fallback")
+
         return NotificationResult(delivered_to="slack", detail="digest_sent")
     except Exception as exc:
         digest["meta"]["notification_error"] = str(exc)
-        return _write_fallback(digest)
+        fallback_result = _write_fallback(digest)
+        if critical_text:
+            _write_fallback(critical_payload)
+        return fallback_result

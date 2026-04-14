@@ -30,7 +30,7 @@ def write_usage_event(event: LLMUsageEvent, path: str | Path = DEFAULT_USAGE_PAT
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(asdict(event), ensure_ascii=True))
+        handle.write(json.dumps(asdict(event), ensure_ascii=True))  # type: ignore
         handle.write("\n")
 
 
@@ -76,7 +76,7 @@ def summarize_usage(path: str | Path = DEFAULT_USAGE_PATH, since_hours: int | No
         except Exception:
             continue
 
-        if cutoff is not None and created_at < cutoff:
+        if cutoff is not None and created_at < cutoff:  # type: ignore
             continue
 
         event["created_at"] = created_at.isoformat()

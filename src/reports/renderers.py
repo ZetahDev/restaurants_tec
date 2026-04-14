@@ -1,3 +1,44 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from textwrap import wrap
+from typing import TYPE_CHECKING
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
+if TYPE_CHECKING:
+    from src.reports.weekly_report import WeeklyMetrics
+
+
+def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None:
+    report_payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "week_start": metrics.week_start.isoformat(),
+        "week_end": metrics.week_end.isoformat(),
+        "summary": summary,
+        "total_reviews": metrics.total_reviews,
+        "sentiment_distribution": metrics.sentiment_distribution,
+        "top_rated_locations": [
+            {"location_id": loc, "avg_rating": round(avg, 2)}  # type: ignore
+            for loc, avg in metrics.top_rated_locations
+        ],
+        "lowest_rated_locations": [
+            {"location_id": loc, "avg_rating": round(avg, 2)}  # type: ignore
+            for loc, avg in metrics.lowest_rated_locations
+        ],
+        "top_problem_locations": [
+            {"location_id": loc, "negative_count": count}
+            for loc, count in metrics.top_problem_locations
+        ],
+        "category_frequency": metrics.category_frequency,
+        "comment_samples": metrics.comment_samples,
+    }
+    report_payload_json = json.dumps(report_payload, ensure_ascii=False)
+
+    html = f"""
 <!doctype html>
 <html lang="es">
 <head>
@@ -8,7 +49,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
+    :root {{
       --bg: #f6f3ee;
       --surface: #fffaf2;
       --ink: #1f2427;
@@ -21,13 +62,13 @@
       --risk: #b42318;
       --radius: 16px;
       --shadow: 0 16px 32px rgba(37, 43, 46, 0.08);
-    }
+    }}
 
-    * {
+    * {{
       box-sizing: border-box;
-    }
+    }}
 
-    body {
+    body {{
       margin: 0;
       background:
         radial-gradient(circle at 85% -10%, rgba(11, 122, 117, 0.2), transparent 40%),
@@ -37,64 +78,64 @@
       font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
       min-height: 100vh;
       line-height: 1.4;
-    }
+    }}
 
-    .page {
+    .page {{
       width: min(1200px, 94vw);
       margin: 0 auto;
       padding: 1.2rem 0 2rem;
-    }
+    }}
 
-    .workspace-header {
+    .workspace-header {{
       padding: 1.1rem 0;
       border-bottom: 1px solid var(--line);
       margin-bottom: 1.4rem;
       animation: fadeUp 520ms ease-out both;
-    }
+    }}
 
-    .workspace-header-top {
+    .workspace-header-top {{
       display: flex;
       gap: 0.8rem;
       justify-content: space-between;
       align-items: baseline;
       flex-wrap: wrap;
-    }
+    }}
 
-    .brand {
+    .brand {{
       font-family: "Space Grotesk", sans-serif;
       font-size: 1.4rem;
       font-weight: 700;
       letter-spacing: 0.02em;
-    }
+    }}
 
-    .timestamp {
+    .timestamp {{
       color: var(--muted);
       font-size: 0.9rem;
-    }
+    }}
 
-    h1 {
+    h1 {{
       font-family: "Space Grotesk", sans-serif;
       font-weight: 700;
       font-size: clamp(1.8rem, 3vw, 2.7rem);
       margin: 0.5rem 0 0.35rem;
       max-width: 14ch;
       line-height: 1.05;
-    }
+    }}
 
-    .subtitle {
+    .subtitle {{
       color: var(--muted);
       margin: 0;
       max-width: 66ch;
-    }
+    }}
 
-    .toolbar {
+    .toolbar {{
       margin-top: 1rem;
       display: flex;
       gap: 0.75rem;
       flex-wrap: wrap;
-    }
+    }}
 
-    .btn {
+    .btn {{
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -106,117 +147,117 @@
       text-decoration: none;
       cursor: pointer;
       transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
-    }
+    }}
 
-    .btn:focus-visible {
+    .btn:focus-visible {{
       outline: 2px solid var(--accent);
       outline-offset: 2px;
-    }
+    }}
 
-    .btn-primary {
+    .btn-primary {{
       background: var(--ink);
       color: #fff;
       box-shadow: var(--shadow);
-    }
+    }}
 
-    .btn-secondary {
+    .btn-secondary {{
       background: transparent;
       color: var(--ink);
       border-color: var(--line);
-    }
+    }}
 
-    .btn:hover {
+    .btn:hover {{
       transform: translateY(-1px);
-    }
+    }}
 
-    .layout {
+    .layout {{
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;
       gap: 1.25rem;
       align-items: start;
-    }
+    }}
 
-    .main {
+    .main {{
       display: grid;
       gap: 1rem;
-    }
+    }}
 
-    .kpi-strip {
+    .kpi-strip {{
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       border: 1px solid var(--line);
       border-radius: var(--radius);
       overflow: hidden;
       background: var(--surface);
-    }
+    }}
 
-    .kpi {
+    .kpi {{
       padding: 1rem;
       min-height: 104px;
       border-right: 1px solid var(--line);
-    }
+    }}
 
-    .kpi:last-child {
+    .kpi:last-child {{
       border-right: none;
-    }
+    }}
 
-    .kpi-label {
+    .kpi-label {{
       color: var(--muted);
       font-size: 0.85rem;
       letter-spacing: 0.01em;
       margin-bottom: 0.3rem;
-    }
+    }}
 
-    .kpi-value {
+    .kpi-value {{
       font-family: "Space Grotesk", sans-serif;
       font-size: clamp(1.4rem, 2.4vw, 2rem);
       font-weight: 700;
-    }
+    }}
 
-    .kpi-hint {
+    .kpi-hint {{
       margin-top: 0.2rem;
       font-size: 0.82rem;
       color: var(--muted);
-    }
+    }}
 
-    .panel {
+    .panel {{
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--surface);
       padding: 1rem;
-    }
+    }}
 
-    .panel h2 {
+    .panel h2 {{
       margin: 0;
       font-family: "Space Grotesk", sans-serif;
       font-size: 1.05rem;
       font-weight: 700;
       letter-spacing: 0.01em;
-    }
+    }}
 
-    .panel-head {
+    .panel-head {{
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
       flex-wrap: wrap;
       margin-bottom: 0.8rem;
-    }
+    }}
 
-    .split {
+    .split {{
       display: grid;
       grid-template-columns: 260px 1fr;
       gap: 1rem;
       align-items: center;
-    }
+    }}
 
-    .sentiment-ring-wrap {
+    .sentiment-ring-wrap {{
       display: grid;
       place-items: center;
       min-height: 220px;
-    }
+    }}
 
-    .sentiment-ring {
+    .sentiment-ring {{
       --positive: 0;
       --negative: 0;
       --neutral: 100;
@@ -232,49 +273,49 @@
       place-items: center;
       position: relative;
       transition: transform 280ms ease;
-    }
+    }}
 
-    .sentiment-ring::after {
+    .sentiment-ring::after {{
       content: "";
       width: 64%;
       aspect-ratio: 1 / 1;
       border-radius: 50%;
       background: var(--surface);
       box-shadow: inset 0 0 0 1px var(--line);
-    }
+    }}
 
-    .sentiment-ring:hover {
+    .sentiment-ring:hover {{
       transform: rotate(-5deg) scale(1.02);
-    }
+    }}
 
-    .ring-center {
+    .ring-center {{
       position: absolute;
       text-align: center;
       display: grid;
       gap: 0.1rem;
       z-index: 1;
-    }
+    }}
 
-    .ring-center strong {
+    .ring-center strong {{
       font-family: "Space Grotesk", sans-serif;
       font-size: 1.6rem;
       line-height: 1;
-    }
+    }}
 
-    .ring-center span {
+    .ring-center span {{
       color: var(--muted);
       font-size: 0.82rem;
-    }
+    }}
 
-    .legend {
+    .legend {{
       list-style: none;
       padding: 0;
       margin: 0;
       display: grid;
       gap: 0.45rem;
-    }
+    }}
 
-    .legend li {
+    .legend li {{
       display: grid;
       grid-template-columns: 14px 1fr auto;
       gap: 0.6rem;
@@ -282,100 +323,100 @@
       font-size: 0.92rem;
       padding-bottom: 0.35rem;
       border-bottom: 1px dashed var(--line);
-    }
+    }}
 
-    .legend-dot {
+    .legend-dot {{
       width: 10px;
       height: 10px;
       border-radius: 999px;
-    }
+    }}
 
-    .table-wrap {
+    .table-wrap {{
       overflow-x: auto;
-    }
+    }}
 
-    table {
+    table {{
       width: 100%;
       border-collapse: collapse;
       font-size: 0.92rem;
-    }
+    }}
 
-    th {
+    th {{
       color: var(--muted);
       font-weight: 600;
       text-align: left;
       padding: 0.5rem 0;
       border-bottom: 1px solid var(--line);
-    }
+    }}
 
-    td {
+    td {{
       padding: 0.58rem 0;
       border-bottom: 1px solid rgba(217, 209, 197, 0.7);
       transition: transform 150ms ease, color 150ms ease;
-    }
+    }}
 
-    tbody tr:hover td {
+    tbody tr:hover td {{
       transform: translateX(3px);
       color: #000;
-    }
+    }}
 
-    .two-columns {
+    .two-columns {{
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
-    }
+    }}
 
-    .controls {
+    .controls {{
       display: flex;
       align-items: center;
       gap: 0.5rem;
       flex-wrap: wrap;
       color: var(--muted);
       font-size: 0.88rem;
-    }
+    }}
 
     .controls input,
-    .controls select {
+    .controls select {{
       border: 1px solid var(--line);
       background: #fff;
       border-radius: 8px;
       padding: 0.36rem 0.5rem;
       font: inherit;
       color: var(--ink);
-    }
+    }}
 
-    .category-list {
+    .category-list {{
       list-style: none;
       padding: 0;
       margin: 0;
       display: grid;
       gap: 0.58rem;
-    }
+    }}
 
-    .category-item {
+    .category-item {{
       display: grid;
       grid-template-columns: 120px 1fr auto;
       align-items: center;
       gap: 0.75rem;
       font-size: 0.9rem;
-    }
+    }}
 
-    .comment-list {
+    .comment-list {{
       list-style: none;
       margin: 0;
       padding: 0;
       display: grid;
       gap: 0.75rem;
-    }
+    }}
 
-    .comment-item {
+    .comment-item {{
       border: 1px solid var(--line);
       border-radius: 12px;
       padding: 0.75rem;
       background: #fffdf8;
-    }
+    }}
 
-    .comment-head {
+    .comment-head {{
       display: flex;
       gap: 0.5rem;
       align-items: center;
@@ -384,9 +425,9 @@
       color: var(--muted);
       margin-bottom: 0.4rem;
       flex-wrap: wrap;
-    }
+    }}
 
-    .comment-pill {
+    .comment-pill {{
       border-radius: 999px;
       padding: 0.12rem 0.45rem;
       font-weight: 600;
@@ -394,31 +435,31 @@
       border: 1px solid var(--line);
       color: var(--ink);
       background: #f5efe4;
-    }
+    }}
 
-    .comment-text {
+    .comment-text {{
       margin: 0;
       font-size: 0.92rem;
       color: #21282c;
-    }
+    }}
 
-    .bar-track {
+    .bar-track {{
       position: relative;
       height: 10px;
       border-radius: 999px;
       background: #ebe5db;
       overflow: hidden;
-    }
+    }}
 
-    .bar-fill {
+    .bar-fill {{
       height: 100%;
       border-radius: 999px;
       background: linear-gradient(90deg, var(--accent), #54a6a2);
       transform-origin: left center;
       transition: width 240ms ease;
-    }
+    }}
 
-    .sidebar {
+    .sidebar {{
       position: sticky;
       top: 1rem;
       border: 1px solid var(--line);
@@ -426,95 +467,95 @@
       background: linear-gradient(180deg, #fffdf9 0%, #fff7eb 100%);
       padding: 1rem;
       box-shadow: var(--shadow);
-    }
+    }}
 
-    .sidebar h2 {
+    .sidebar h2 {{
       margin: 0 0 0.5rem;
       font-family: "Space Grotesk", sans-serif;
       font-size: 1.05rem;
-    }
+    }}
 
-    .sidebar p {
+    .sidebar p {{
       margin: 0;
       color: #2f363a;
       font-size: 0.95rem;
-    }
+    }}
 
-    .sidebar h3 {
+    .sidebar h3 {{
       margin: 1rem 0 0.45rem;
       font-size: 0.9rem;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.04em;
-    }
+    }}
 
-    .actions-list {
+    .actions-list {{
       margin: 0;
       padding-left: 1.1rem;
       display: grid;
       gap: 0.46rem;
       font-size: 0.9rem;
-    }
+    }}
 
-    .footer {
+    .footer {{
       margin-top: 1rem;
       color: var(--muted);
       font-size: 0.82rem;
-    }
+    }}
 
-    .reveal {
+    .reveal {{
       opacity: 0;
       transform: translateY(14px);
       animation: fadeUp 480ms ease-out forwards;
-    }
+    }}
 
-    .delay-1 { animation-delay: 60ms; }
-    .delay-2 { animation-delay: 120ms; }
-    .delay-3 { animation-delay: 180ms; }
-    .delay-4 { animation-delay: 240ms; }
+    .delay-1 {{ animation-delay: 60ms; }}
+    .delay-2 {{ animation-delay: 120ms; }}
+    .delay-3 {{ animation-delay: 180ms; }}
+    .delay-4 {{ animation-delay: 240ms; }}
 
-    @keyframes fadeUp {
-      to {
+    @keyframes fadeUp {{
+      to {{
         opacity: 1;
         transform: translateY(0);
-      }
-    }
+      }}
+    }}
 
-    @media (max-width: 1024px) {
-      .layout {
+    @media (max-width: 1024px) {{
+      .layout {{
         grid-template-columns: 1fr;
-      }
+      }}
 
-      .sidebar {
+      .sidebar {{
         position: static;
-      }
-    }
+      }}
+    }}
 
-    @media (max-width: 760px) {
-      .kpi-strip {
+    @media (max-width: 760px) {{
+      .kpi-strip {{
         grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+      }}
 
-      .kpi:nth-child(2n) {
+      .kpi:nth-child(2n) {{
         border-right: none;
-      }
+      }}
 
-      .kpi:nth-child(-n+2) {
+      .kpi:nth-child(-n+2) {{
         border-bottom: 1px solid var(--line);
-      }
+      }}
 
-      .split {
+      .split {{
         grid-template-columns: 1fr;
-      }
+      }}
 
-      .two-columns {
+      .two-columns {{
         grid-template-columns: 1fr;
-      }
+      }}
 
-      .category-item {
+      .category-item {{
         grid-template-columns: 92px 1fr auto;
-      }
-    }
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -659,57 +700,57 @@
     <footer class="footer" id="footerMeta"></footer>
   </div>
 
-  <script id="report-data" type="application/json">{"generated_at": "2026-04-14T18:45:38.009414+00:00", "week_start": "2026-04-07T00:00:00+00:00", "week_end": "2026-04-14T00:00:00+00:00", "summary": "Durante la semana del 7 al 14 de abril de 2026, se registraron 345 reseñas, con una distribución de sentimientos del 40.29% positivo, 35.94% negativo y 23.77% neutral. Las principales áreas de mejora incluyen el servicio y la limpieza, destacando que los lugares con calificaciones más bajas (2.41 a 2.71) requieren atención urgente. Se recomienda implementar acciones correctivas en los locales con mayores quejas, especialmente en los aspectos de ruido, espera y calidad del producto, para mejorar la experiencia del cliente y optimizar la satisfacción general.", "total_reviews": 345, "sentiment_distribution": {"positive": 40.29, "negative": 35.94, "neutral": 23.77}, "top_rated_locations": [{"location_id": 6, "avg_rating": 3.59}, {"location_id": 13, "avg_rating": 3.5}, {"location_id": 2, "avg_rating": 3.5}], "lowest_rated_locations": [{"location_id": 9, "avg_rating": 2.41}, {"location_id": 11, "avg_rating": 2.48}, {"location_id": 14, "avg_rating": 2.71}], "top_problem_locations": [{"location_id": 2, "negative_count": 13}, {"location_id": 5, "negative_count": 12}, {"location_id": 7, "negative_count": 10}], "category_frequency": {"servicio": 175, "producto": 121, "ambiente": 74, "precio": 41, "otro": 37, "limpieza": 32}, "comment_samples": [{"location_id": 8, "rating": 1, "text": "The place was noisy and the wait was long.", "created_at": "2026-04-13T22:49:14.340513", "sentiment": "negative", "urgency": 4, "summary": "El lugar estaba ruidoso y la espera fue larga."}, {"location_id": 4, "rating": 1, "text": "The place was noisy and the wait was long.", "created_at": "2026-04-13T22:49:14.331867", "sentiment": "negative", "urgency": 4, "summary": "El lugar era ruidoso y la espera fue larga."}, {"location_id": 12, "rating": 4, "text": "The product quality dropped since my last visit.", "created_at": "2026-04-13T14:49:14.348064", "sentiment": "negative", "urgency": 4, "summary": "La calidad del producto ha bajado desde mi última visita."}, {"location_id": 7, "rating": 1, "text": "Too expensive for what you get.", "created_at": "2026-04-13T14:49:14.338100", "sentiment": "negative", "urgency": 4, "summary": "Demasiado caro para lo que se ofrece."}, {"location_id": 5, "rating": 1, "text": "Good flavor but the coffee arrived cold.", "created_at": "2026-04-13T14:49:14.334023", "sentiment": "negative", "urgency": 4, "summary": "El café llegó frío a pesar de tener buen sabor."}, {"location_id": 4, "rating": 4, "text": "Too expensive for what you get.", "created_at": "2026-04-13T14:49:14.331867", "sentiment": "negative", "urgency": 4, "summary": "Demasiado caro para lo que se ofrece."}, {"location_id": 2, "rating": 2, "text": "The place was dirty and noisy.", "created_at": "2026-04-13T14:40:34.192281", "sentiment": "negative", "urgency": 4, "summary": "El lugar estaba sucio y ruidoso."}, {"location_id": 14, "rating": 4, "text": "The counter area was not clean.", "created_at": "2026-04-13T06:49:14.351420", "sentiment": "negative", "urgency": 4, "summary": "El área del mostrador no estaba limpia."}]}</script>
+  <script id="report-data" type="application/json">{report_payload_json}</script>
   <script>
-    (() => {
-      const state = {
+    (() => {{
+      const state = {{
         status: "booting",
         data: null,
         error: null,
-      };
+      }};
 
-      const fmtPercent = (value) => `${Number(value ?? 0).toFixed(2)}%`;
+      const fmtPercent = (value) => `${{Number(value ?? 0).toFixed(2)}}%`;
 
       const byId = (id) => document.getElementById(id);
       const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
-      function transition(event, payload = null) {
-        if (state.status === "booting" && event === "DATA_OK") {
+      function transition(event, payload = null) {{
+        if (state.status === "booting" && event === "DATA_OK") {{
           state.status = "ready";
           state.data = payload;
           render();
           return;
-        }
+        }}
 
-        if (event === "FAIL") {
+        if (event === "FAIL") {{
           state.status = "error";
           state.error = payload || "No se pudo construir el reporte.";
           renderError();
-        }
-      }
+        }}
+      }}
 
-      function parseData() {
+      function parseData() {{
         const raw = byId("report-data");
-        if (!raw) {
+        if (!raw) {{
           transition("FAIL", "No hay payload del reporte.");
           return;
-        }
+        }}
 
-        try {
-          const parsed = JSON.parse(raw.textContent || "{}");
+        try {{
+          const parsed = JSON.parse(raw.textContent || "{{}}");
           transition("DATA_OK", parsed);
-        } catch (error) {
+        }} catch (error) {{
           transition("FAIL", String(error));
-        }
-      }
+        }}
+      }}
 
-      function renderHeader(data) {
-        byId("generatedAt").textContent = `Actualizado: ${new Date(data.generated_at).toLocaleString("es-CO", { hour12: false })}`;
-        byId("windowLabel").textContent = `Ventana: ${new Date(data.week_start).toLocaleString("es-CO", { hour12: false })} -> ${new Date(data.week_end).toLocaleString("es-CO", { hour12: false })}`;
-      }
+      function renderHeader(data) {{
+        byId("generatedAt").textContent = `Actualizado: ${{new Date(data.generated_at).toLocaleString("es-CO", {{ hour12: false }})}}`;
+        byId("windowLabel").textContent = `Ventana: ${{new Date(data.week_start).toLocaleString("es-CO", {{ hour12: false }})}} -> ${{new Date(data.week_end).toLocaleString("es-CO", {{ hour12: false }})}}`;
+      }}
 
-      function renderKpi(data) {
-        const sentiment = data.sentiment_distribution || {};
+      function renderKpi(data) {{
+        const sentiment = data.sentiment_distribution || {{}};
         const positive = Number(sentiment.positive || 0);
         const negative = Number(sentiment.negative || 0);
 
@@ -718,19 +759,19 @@
         byId("kpiPositiveRate").textContent = fmtPercent(positive);
 
         const friction = positive > 0 ? (negative / positive) : negative;
-        byId("kpiFriction").textContent = `${friction.toFixed(2)}x`;
-      }
+        byId("kpiFriction").textContent = `${{friction.toFixed(2)}}x`;
+      }}
 
-      function renderSentiment(data) {
-        const sentiment = data.sentiment_distribution || {};
+      function renderSentiment(data) {{
+        const sentiment = data.sentiment_distribution || {{}};
         const positive = clamp(Number(sentiment.positive || 0), 0, 100);
         const negative = clamp(Number(sentiment.negative || 0), 0, 100);
         let neutral = clamp(Number(sentiment.neutral || 0), 0, 100);
         const total = positive + negative + neutral;
 
-        if (total !== 100 && total > 0) {
+        if (total !== 100 && total > 0) {{
           neutral = clamp(100 - positive - negative, 0, 100);
-        }
+        }}
 
         const ring = byId("sentimentRing");
         ring.style.setProperty("--positive", positive.toFixed(2));
@@ -747,27 +788,27 @@
 
         legend.innerHTML = entries.map(([label, value, color]) => `
           <li>
-            <span class="legend-dot" style="background:${color};"></span>
-            <span>${label}</span>
-            <strong>${fmtPercent(value)}</strong>
+            <span class="legend-dot" style="background:${{color}};"></span>
+            <span>${{label}}</span>
+            <strong>${{fmtPercent(value)}}</strong>
           </li>
         `).join("");
-      }
+      }}
 
-      function tableRows(entries, leftKey, rightKey, formatter) {
-        if (!entries || entries.length === 0) {
+      function tableRows(entries, leftKey, rightKey, formatter) {{
+        if (!entries || entries.length === 0) {{
           return `<tr><td colspan="2">Sin datos para esta ventana.</td></tr>`;
-        }
+        }}
 
         return entries.map((entry) => `
           <tr>
-            <td>Location ${entry[leftKey]}</td>
-            <td>${formatter(entry[rightKey])}</td>
+            <td>Location ${{entry[leftKey]}}</td>
+            <td>${{formatter(entry[rightKey])}}</td>
           </tr>
         `).join("");
-      }
+      }}
 
-      function renderTables(data) {
+      function renderTables(data) {{
         const rated = Array.isArray(data.top_rated_locations) ? data.top_rated_locations : [];
         const lowest = Array.isArray(data.lowest_rated_locations) ? data.lowest_rated_locations : [];
         const problem = Array.isArray(data.top_problem_locations) ? data.top_problem_locations : [];
@@ -790,149 +831,149 @@
           "negative_count",
           (value) => String(value),
         );
-      }
+      }}
 
-      function buildActions(data) {
-        const sentiment = data.sentiment_distribution || {};
+      function buildActions(data) {{
+        const sentiment = data.sentiment_distribution || {{}};
         const negative = Number(sentiment.negative || 0);
         const topProblem = (data.top_problem_locations || [])[0];
         const topRated = (data.top_rated_locations || [])[0];
         const actions = [];
 
-        if (negative >= 35) {
+        if (negative >= 35) {{
           actions.push("Escalar revisión operativa diaria para ubicaciones con mayor fricción.");
-        } else {
+        }} else {{
           actions.push("Mantener monitoreo semanal y revisar picos negativos por turno.");
-        }
+        }}
 
-        if (topProblem) {
-          actions.push(`Priorizar plan de recuperación para Location ${topProblem.location_id} (mayor volumen negativo).`);
-        }
+        if (topProblem) {{
+          actions.push(`Priorizar plan de recuperación para Location ${{topProblem.location_id}} (mayor volumen negativo).`);
+        }}
 
-        if (topRated) {
-          actions.push(`Replicar prácticas de Location ${topRated.location_id} en locales con desempeño inferior.`);
-        }
+        if (topRated) {{
+          actions.push(`Replicar prácticas de Location ${{topRated.location_id}} en locales con desempeño inferior.`);
+        }}
 
-        if (actions.length < 3) {
+        if (actions.length < 3) {{
           actions.push("Validar cumplimiento de protocolos de servicio y tiempos de atención.");
-        }
+        }}
 
         return actions.slice(0, 4);
-      }
+      }}
 
-      function renderSidebar(data) {
+      function renderSidebar(data) {{
         byId("summaryText").textContent = data.summary || "Sin resumen disponible.";
         const actions = buildActions(data);
-        byId("actionsList").innerHTML = actions.map((action) => `<li>${action}</li>`).join("");
-      }
+        byId("actionsList").innerHTML = actions.map((action) => `<li>${{action}}</li>`).join("");
+      }}
 
-      function renderCategoryControls(data) {
-        const values = Object.values(data.category_frequency || {}).map((v) => Number(v));
+      function renderCategoryControls(data) {{
+        const values = Object.values(data.category_frequency || {{}}).map((v) => Number(v));
         const maxMentions = values.length ? Math.max(...values) : 1;
         const minMentionsInput = byId("minMentions");
         minMentionsInput.max = String(Math.max(1, maxMentions));
         minMentionsInput.value = minMentionsInput.value || "1";
         byId("minMentionsValue").textContent = minMentionsInput.value;
-      }
+      }}
 
-      function renderCategories(data) {
+      function renderCategories(data) {{
         const categoryList = byId("categoryList");
         const minMentions = Number(byId("minMentions").value || 1);
         const sortMode = byId("sortMode").value;
-        const rows = Object.entries(data.category_frequency || {})
-          .map(([name, mentions]) => ({ name, mentions: Number(mentions) }))
+        const rows = Object.entries(data.category_frequency || {{}})
+          .map(([name, mentions]) => ({{ name, mentions: Number(mentions) }}))
           .filter((row) => row.mentions >= minMentions);
 
-        if (sortMode === "asc") {
+        if (sortMode === "asc") {{
           rows.sort((a, b) => a.mentions - b.mentions);
-        } else if (sortMode === "alpha") {
+        }} else if (sortMode === "alpha") {{
           rows.sort((a, b) => a.name.localeCompare(b.name, "es"));
-        } else {
+        }} else {{
           rows.sort((a, b) => b.mentions - a.mentions);
-        }
+        }}
 
         const maxMentions = rows.length ? Math.max(...rows.map((row) => row.mentions)) : 1;
-        if (rows.length === 0) {
+        if (rows.length === 0) {{
           categoryList.innerHTML = `<li>No hay categorías con ese filtro.</li>`;
           return;
-        }
+        }}
 
-        categoryList.innerHTML = rows.map((row) => {
+        categoryList.innerHTML = rows.map((row) => {{
           const width = ((row.mentions / maxMentions) * 100).toFixed(2);
           return `
             <li class="category-item">
-              <span>${row.name}</span>
-              <div class="bar-track"><div class="bar-fill" style="width:${width}%;"></div></div>
-              <strong>${row.mentions}</strong>
+              <span>${{row.name}}</span>
+              <div class="bar-track"><div class="bar-fill" style="width:${{width}}%;"></div></div>
+              <strong>${{row.mentions}}</strong>
             </li>
           `;
-        }).join("");
-      }
+        }}).join("");
+      }}
 
-      function renderCommentSamples(data) {
+      function renderCommentSamples(data) {{
         const commentList = byId("commentList");
         const rows = Array.isArray(data.comment_samples) ? data.comment_samples : [];
 
-        if (!rows.length) {
+        if (!rows.length) {{
           commentList.innerHTML = `<li class="comment-item">No hay comentarios destacados en esta ventana.</li>`;
           return;
-        }
+        }}
 
-        commentList.innerHTML = rows.map((row) => {
+        commentList.innerHTML = rows.map((row) => {{
           const sentiment = String(row.sentiment || "").toUpperCase();
           const createdAt = row.created_at
-            ? new Date(row.created_at).toLocaleString("es-CO", { hour12: false })
+            ? new Date(row.created_at).toLocaleString("es-CO", {{ hour12: false }})
             : "--";
           const text = String(row.text || "").trim();
-          const compactText = text.length > 180 ? `${text.slice(0, 177)}...` : text;
+          const compactText = text.length > 180 ? `${{text.slice(0, 177)}}...` : text;
           return `
             <li class="comment-item">
               <div class="comment-head">
-                <span>Local ${row.location_id} | Rating ${row.rating} | Urgencia ${row.urgency}</span>
-                <span class="comment-pill">${sentiment}</span>
+                <span>Local ${{row.location_id}} | Rating ${{row.rating}} | Urgencia ${{row.urgency}}</span>
+                <span class="comment-pill">${{sentiment}}</span>
               </div>
-              <p class="comment-text">${compactText}</p>
+              <p class="comment-text">${{compactText}}</p>
               <div class="comment-head" style="margin-top:0.45rem;">
-                <span>Resumen IA: ${row.summary || "Sin resumen"}</span>
-                <span>${createdAt}</span>
+                <span>Resumen IA: ${{row.summary || "Sin resumen"}}</span>
+                <span>${{createdAt}}</span>
               </div>
             </li>
           `;
-        }).join("");
-      }
+        }}).join("");
+      }}
 
-      function rerunRevealAnimations() {
-        document.querySelectorAll(".reveal").forEach((element) => {
+      function rerunRevealAnimations() {{
+        document.querySelectorAll(".reveal").forEach((element) => {{
           element.style.animation = "none";
           element.offsetHeight;
           element.style.animation = "";
-        });
-      }
+        }});
+      }}
 
-      function wireInteractions(data) {
-        byId("minMentions").addEventListener("input", (event) => {
+      function wireInteractions(data) {{
+        byId("minMentions").addEventListener("input", (event) => {{
           const target = event.target;
           byId("minMentionsValue").textContent = target.value;
           renderCategories(data);
-        });
+        }});
 
-        byId("sortMode").addEventListener("change", () => {
+        byId("sortMode").addEventListener("change", () => {{
           renderCategories(data);
-        });
+        }});
 
-        byId("rerenderBtn").addEventListener("click", () => {
+        byId("rerenderBtn").addEventListener("click", () => {{
           rerunRevealAnimations();
-        });
-      }
+        }});
+      }}
 
-      function renderMeta(data) {
-        byId("footerMeta").textContent = `Fuente: pipeline ETL + análisis estructurado LLM | Ventana ${data.week_start} -> ${data.week_end}`;
-      }
+      function renderMeta(data) {{
+        byId("footerMeta").textContent = `Fuente: pipeline ETL + análisis estructurado LLM | Ventana ${{data.week_start}} -> ${{data.week_end}}`;
+      }}
 
-      function render() {
-        if (state.status !== "ready" || !state.data) {
+      function render() {{
+        if (state.status !== "ready" || !state.data) {{
           return;
-        }
+        }}
 
         const data = state.data;
         renderHeader(data);
@@ -945,19 +986,210 @@
         renderCommentSamples(data);
         renderMeta(data);
         wireInteractions(data);
-      }
+      }}
 
-      function renderError() {
+      function renderError() {{
         document.body.innerHTML = `
           <main style="padding:2rem;font-family:IBM Plex Sans, sans-serif;">
             <h1>No se pudo renderizar el reporte</h1>
-            <p>${state.error || "Error desconocido"}</p>
+            <p>${{state.error || "Error desconocido"}}</p>
           </main>
         `;
-      }
+      }}
 
       parseData();
-    })();
+    }})();
   </script>
 </body>
 </html>
+    """.strip()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(html, encoding="utf-8")
+
+
+def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(output_path), pagesize=A4)
+    width, height = A4
+
+    margin = 36
+    y = height - margin
+
+    def ensure_space(required: float) -> None:
+        nonlocal y
+        if y - required < margin:
+            c.showPage()
+            y = height - margin
+
+    def draw_section_title(title: str) -> None:
+        nonlocal y
+        ensure_space(24)
+        c.setFillColorRGB(0.11, 0.20, 0.25)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin, y, title)
+        y = y - 16
+
+    # Header band
+    header_height = 68
+    c.setFillColorRGB(0.10, 0.22, 0.26)
+    c.rect(0, height - header_height, width, header_height, fill=1, stroke=0)
+
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(margin, height - 28, "BrewMaster | FeedbackIQ")
+    c.setFont("Helvetica", 10)
+    c.drawString(margin, height - 44, "Reporte semanal de experiencia de clientes")
+
+    y = height - header_height - 14
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 9)
+    c.drawString(
+        margin,
+        y,
+        f"Ventana: {metrics.week_start.strftime('%Y-%m-%d %H:%M UTC')} -> {metrics.week_end.strftime('%Y-%m-%d %H:%M UTC')}",
+    )
+    y -= 18
+
+    # KPI cards
+    card_gap = 10
+    card_w = (width - (margin * 2) - (card_gap * 2)) / 3
+    card_h = 48
+    kpis = [
+        ("Total resenas", str(metrics.total_reviews)),
+        ("Sentimiento negativo", f"{metrics.sentiment_distribution['negative']:.2f}%"),
+        ("Sentimiento positivo", f"{metrics.sentiment_distribution['positive']:.2f}%"),
+    ]
+
+    ensure_space(card_h + 18)
+    for idx, (label, value) in enumerate(kpis):
+        x = margin + idx * (card_w + card_gap)
+        c.setFillColorRGB(0.96, 0.95, 0.92)
+        c.roundRect(x, y - card_h, card_w, card_h, 6, fill=1, stroke=0)
+        c.setFillColorRGB(0.33, 0.37, 0.41)
+        c.setFont("Helvetica", 8)
+        c.drawString(x + 8, y - 14, label)
+        c.setFillColorRGB(0.12, 0.17, 0.20)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x + 8, y - 32, value)
+    y -= card_h + 16
+
+    # Executive summary
+    draw_section_title("Resumen ejecutivo")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 10)
+    summary_lines = wrap(summary.strip() or "Sin resumen disponible.", width=100)
+    for line in summary_lines:
+        ensure_space(14)
+        c.drawString(margin, y, line)
+        y -= 13
+    y -= 8
+
+    # Sentiment chart (horizontal bars)
+    draw_section_title("Grafico de sentimiento (%)")
+    chart_x = margin
+    chart_w = width - (margin * 2)
+    bar_h = 12
+    bar_gap = 16
+    bars = [
+        ("Positivo", float(metrics.sentiment_distribution["positive"]), (0.18, 0.62, 0.27)),
+        ("Negativo", float(metrics.sentiment_distribution["negative"]), (0.71, 0.14, 0.09)),
+        ("Neutral", float(metrics.sentiment_distribution["neutral"]), (0.85, 0.47, 0.02)),
+    ]
+    ensure_space((bar_h + bar_gap) * len(bars) + 8)
+    for label, pct, color in bars:
+        c.setFillColorRGB(0.35, 0.40, 0.43)
+        c.setFont("Helvetica", 9)
+        c.drawString(chart_x, y, label)
+        track_x = chart_x + 68
+        track_w = chart_w - 130
+        c.setFillColorRGB(0.90, 0.90, 0.90)
+        c.rect(track_x, y - 8, track_w, bar_h, fill=1, stroke=0)
+        fill_w = max(0, min(track_w, track_w * (pct / 100.0)))
+        c.setFillColorRGB(*color)
+        c.rect(track_x, y - 8, fill_w, bar_h, fill=1, stroke=0)
+        c.setFillColorRGB(0.15, 0.15, 0.15)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(chart_x + chart_w, y, f"{pct:.2f}%")
+        y -= bar_h + bar_gap
+    y -= 2
+
+    def draw_rank_list(title: str, rows: list[tuple[int, float | int]], value_fmt: str) -> None:
+        nonlocal y
+        draw_section_title(title)
+        c.setFillColorRGB(0.15, 0.15, 0.15)
+        c.setFont("Helvetica", 10)
+        if not rows:
+            ensure_space(14)
+            c.drawString(margin, y, "- Sin datos en esta ventana.")
+            y = y - 14
+            return
+
+        for pos, (location_id, value) in enumerate(rows, start=1):
+            ensure_space(14)
+            c.drawString(margin, y, f"{pos}. Local {location_id}: {value_fmt.format(value)}")
+            y = y - 13
+        y = y - 4
+
+    draw_rank_list(
+        "Top 3 locales mejor valorados",
+        metrics.top_rated_locations,
+        "{:.2f} de rating promedio",
+    )
+    draw_rank_list(
+        "Top 3 locales con menor rating",
+        metrics.lowest_rated_locations,
+        "{:.2f} de rating promedio",
+    )
+    draw_rank_list(
+        "Top 3 locales con mas problemas",
+        [(loc, count) for loc, count in metrics.top_problem_locations],
+        "{} resenas negativas",
+    )
+
+    draw_section_title("Temas mas mencionados")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 10)
+    categories = list(metrics.category_frequency.items())[:6]  # type: ignore
+    if not categories:
+        c.drawString(margin, y, "- Sin categorias disponibles.")
+        y -= 13
+    else:
+        for category, mentions in categories:
+            ensure_space(14)
+            c.drawString(margin, y, f"- {category}: {mentions} menciones")
+            y -= 13
+
+    y -= 4
+    draw_section_title("Voz del cliente (muestras negativas y neutrales)")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 9)
+    if not metrics.comment_samples:
+        ensure_space(14)
+        c.drawString(margin, y, "- Sin comentarios destacados en esta ventana.")
+        y -= 13
+    else:
+        for idx, sample in enumerate(metrics.comment_samples[:6], start=1):  # type: ignore
+            ensure_space(30)
+            text = str(sample["text"]).strip()
+            compact = text if len(text) <= 120 else f"{text[:117]}..."  # type: ignore
+            c.drawString(
+                margin,
+                y,
+                f"{idx}. Local {sample['location_id']} | {str(sample['sentiment']).upper()} | urg={sample['urgency']}",
+            )
+            y -= 12
+            c.drawString(margin + 10, y, compact)
+            y -= 14
+
+    # Footer
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.45, 0.45, 0.45)
+    c.drawRightString(
+        width - margin,
+        18,
+        f"Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+    )
+
+    c.save()
+

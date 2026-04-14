@@ -6,7 +6,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - Consolida reseñas desde API + encuestas.
 - Ejecuta ETL idempotente con `upsert` y `dead_letter_events`.
 - Analiza reseñas con LLM en salida estructurada validada.
-- Genera alertas deduplicadas y notifica por Slack en formato digest legible.
+- Genera alertas deduplicadas y notifica por Slack con digest legible + canal inmediato para CRÍTICA.
 - Produce reporte semanal en HTML/PDF.
 - Incluye comando de preparación de demo (`prep-demo`) para estado de presentación.
 
@@ -14,7 +14,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - Consolidates reviews from API + survey sources.
 - Runs idempotent ETL with upsert and dead-letter handling.
 - Performs structured LLM analysis with schema validation.
-- Generates deduplicated alerts and readable Slack digest notifications.
+- Generates deduplicated alerts with readable Slack digest + immediate critical channel.
 - Produces weekly HTML/PDF report.
 - Includes a `prep-demo` command for deterministic presentation readiness.
 
@@ -22,7 +22,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - `src/api`: dummy FastAPI source (`GET /api/reviews`) + docs in `/docs`.
 - `src/etl`: extractors, transformers, loader, ETL pipeline.
 - `src/analysis`: prompts, output schema, OpenAI analyzer with retries.
-- `src/alerts`: detector rules + digest notifier.
+- `src/alerts`: detector rules + digest notifier + immediate critical notifier.
 - `src/reports`: weekly metrics + HTML/PDF rendering.
 - `src/scripts`: seed + prep-demo orchestration.
 
@@ -172,6 +172,7 @@ If Docker is not available, use this replacement for command 3:
   - Analysis stage is skipped by design.
 - Slack webhook missing/failing:
   - Digest payload is written to `artifacts/alerts_webhook_fallback.jsonl`.
+  - If critical immediate notification fails, it is also persisted to the same JSONL fallback.
 - Want a clean demo state:
   - Use `prep-demo` to backfill analysis, archive/clean dead letters, run alerts, and regenerate report.
 
