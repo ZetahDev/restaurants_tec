@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 
 from src.core.db import session_scope
+from src.etl.pipeline import run_etl
 from src.scripts.seed import seed_customer_surveys
 
 
@@ -13,7 +15,10 @@ def build_parser() -> argparse.ArgumentParser:
     seed_parser = subparsers.add_parser("seed", help="Seed customer surveys table")
     seed_parser.add_argument("--total", type=int, default=220, help="Base generated surveys before forced cases")
 
-    for command in ("etl", "analyze", "alerts", "report", "run-all"):
+    etl_parser = subparsers.add_parser("etl", help="Run ETL pipeline")
+    etl_parser.add_argument("--since", type=str, default=None, help="ISO-8601 UTC timestamp")
+
+    for command in ("analyze", "alerts", "report", "run-all"):
         subparsers.add_parser(command)
 
     return parser
@@ -25,12 +30,30 @@ def cmd_seed(total: int) -> None:
     print(f"Seed complete. Inserted surveys: {stats.inserted}")
 
 
+def cmd_etl(since: str | None) -> None:
+    since_dt = datetime.fromisoformat(since) if since else None
+    stats = run_etl(since=since_dt)
+    print(
+        "ETL complete | "
+        f"api={stats.api_extracted} survey={stats.survey_extracted} "
+        f"transformed={stats.transformed} loaded={stats.loaded} dead_letters={stats.dead_letters}"
+    )
+    if stats.errors:
+        print("Errors:")
+        for err in stats.errors:
+            print(f"- {err}")
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
     if args.command == "seed":
         cmd_seed(total=args.total)
+        return
+
+    if args.command == "etl":
+        cmd_etl(since=args.since)
         return
 
     print(f"Command '{args.command}' is scaffolded and will be implemented in next commits.")
