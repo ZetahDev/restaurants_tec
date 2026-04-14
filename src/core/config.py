@@ -17,6 +17,8 @@ class Settings:
     openai_model: str = field(default_factory=lambda: os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
     slack_webhook_url: str = field(default_factory=lambda: os.getenv("SLACK_WEBHOOK_URL", ""))
     timezone: str = field(default_factory=lambda: os.getenv("TIMEZONE", "UTC"))
+    report_html_path: str = field(default_factory=lambda: os.getenv("REPORT_HTML_PATH", "docs/weekly_report.html"))
+    report_pdf_path: str = field(default_factory=lambda: os.getenv("REPORT_PDF_PATH", "docs/weekly_report.pdf"))
 
 
 @lru_cache(maxsize=1)

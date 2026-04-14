@@ -1371,11 +1371,12 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
 
 
 def generate_weekly_report(week_start: date | None = None) -> ReportStats:
+    settings = get_settings()
     metrics = _collect_metrics(week_start=week_start)
     summary = _executive_summary(metrics)
 
-    html_path = Path("docs/weekly_report.html")
-    pdf_path = Path("docs/weekly_report.pdf")
+    html_path = Path(settings.report_html_path)
+    pdf_path = Path(settings.report_pdf_path)
 
     _render_html(metrics=metrics, summary=summary, output_path=html_path)
     _render_pdf(metrics=metrics, summary=summary, output_path=pdf_path)
