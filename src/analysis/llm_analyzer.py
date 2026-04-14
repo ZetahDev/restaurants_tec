@@ -101,12 +101,6 @@ def analyze_pending_reviews(limit: int = 100) -> AnalysisStats:
     settings = get_settings()
     stats = AnalysisStats()
 
-    if not settings.openai_api_key:
-        stats.errors.append("OPENAI_API_KEY is not set. Skipping analysis stage.")
-        return stats
-
-    client = OpenAI(api_key=settings.openai_api_key)
-
     with session_scope() as session:
         stmt = (
             select(UnifiedReview)
@@ -117,6 +111,12 @@ def analyze_pending_reviews(limit: int = 100) -> AnalysisStats:
         )
         pending = session.scalars(stmt).all()
         stats.pending = len(pending)
+
+        if not settings.openai_api_key:
+            stats.errors.append("OPENAI_API_KEY is not set. Skipping analysis stage.")
+            return stats
+
+        client = OpenAI(api_key=settings.openai_api_key)
 
         for review in pending:
             try:
