@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+alembic
+psycopg[binary]
+pydantic
+httpx
+openai
+tenacity
+python-dateutil
+jinja2
+reportlab
+pytest
+pytest-asyncio

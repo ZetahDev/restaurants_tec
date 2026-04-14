@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: feedbackiq_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: feedbackiq
+      POSTGRES_USER: feedbackiq
+      POSTGRES_PASSWORD: feedbackiq
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  reviews_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: feedbackiq_reviews_api
+    command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8081"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://feedbackiq:feedbackiq@postgres:5432/feedbackiq
+      API_BASE_URL: http://reviews_api:8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: feedbackiq_app
+    command: ["python", "-m", "src.main", "run-all"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://feedbackiq:feedbackiq@postgres:5432/feedbackiq
+      API_BASE_URL: http://reviews_api:8081
+    depends_on:
+      - postgres
+      - reviews_api
+
+volumes:
+  pgdata:

@@ -1,0 +1,31 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+
+# Local private notes
+.private/
+
+# Runtime artifacts
+artifacts/
+*.log
+
+# OS
+.DS_Store
+
+# Build/distribution
+build/
+dist/
+*.egg-info/
+
+# Report outputs (keep docs tracked except generated files)
+docs/weekly_report.html
+docs/weekly_report.pdf
