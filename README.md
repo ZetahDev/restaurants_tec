@@ -164,6 +164,8 @@ If Docker is not available, use this replacement for command 3:
 - `OPENAI_MODEL` (default: `gpt-4o-mini`)
 - `SLACK_WEBHOOK_URL`
 - `TIMEZONE`
+- `REPORT_HTML_PATH`
+- `REPORT_PDF_PATH`
 
 ## Troubleshooting
 - `OPENAI_API_KEY is not set`:
