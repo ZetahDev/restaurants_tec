@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from src.alerts.notifier import notify_alert
+from src.alerts.notifier import notify_alert_digest
 from src.core.db import session_scope
 from src.db.models import Alert, ReviewAnalysis, UnifiedReview
 
@@ -138,6 +138,7 @@ def run_alert_detection(now: datetime | None = None) -> AlertStats:
         candidates.extend(_detect_medium(session=session, now=now_utc))
         stats.generated = len(candidates)
 
+        persisted_alerts: list[Alert] = []
         for candidate in candidates:
             if _alert_exists(session=session, candidate=candidate):
                 continue
@@ -152,10 +153,17 @@ def run_alert_detection(now: datetime | None = None) -> AlertStats:
             )
             session.add(alert)
             session.flush()
-            stats.persisted += 1
+            persisted_alerts.append(alert)
 
-            notify_result = notify_alert(alert)
-            if notify_result.delivered_to:
-                stats.notified += 1
+        stats.persisted = len(persisted_alerts)
+
+        notify_result = notify_alert_digest(
+            alerts=persisted_alerts,
+            generated=stats.generated,
+            persisted=stats.persisted,
+            run_at=now_utc,
+        )
+        if notify_result.delivered_to:
+            stats.notified = stats.persisted
 
     return stats
