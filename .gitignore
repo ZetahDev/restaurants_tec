@@ -29,3 +29,6 @@ dist/
 # Report outputs (keep docs tracked except generated files)
 docs/weekly_report.html
 docs/weekly_report.pdf
+
+# Local sqlite artifacts
+*.db
