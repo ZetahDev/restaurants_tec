@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Sentiment = Literal["positive", "negative", "neutral"]
 Category = Literal["producto", "servicio", "ambiente", "precio", "limpieza", "otro"]
 
 
 class ReviewAnalysisOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sentiment: Sentiment
     categories: list[Category] = Field(min_length=1)
     summary: str = Field(max_length=100)
