@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from src.analysis.prompts import SYSTEM_PROMPT
+from src.analysis.prompts import SYSTEM_PROMPT, build_analysis_user_prompt
 from src.analysis.schemas import ReviewAnalysisOutput
 from src.analysis.usage_tracker import LLMUsageEvent, write_usage_event
 from src.core.config import get_settings
@@ -45,11 +45,7 @@ def _analysis_insert_statement(dialect: str):
 )
 def _request_analysis(client: OpenAI, model: str, review_text: str, rating: int) -> tuple[ReviewAnalysisOutput, dict[str, int | str]]:
     schema = ReviewAnalysisOutput.model_json_schema()
-    user_prompt = (
-        "Analyze this customer review and produce structured output.\n"
-        f"Rating: {rating}\n"
-        f"Text: {review_text}"
-    )
+    user_prompt = build_analysis_user_prompt(review_text=review_text, rating=rating)
 
     response = client.chat.completions.create(
         model=model,

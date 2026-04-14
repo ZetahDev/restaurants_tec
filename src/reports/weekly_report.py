@@ -15,6 +15,7 @@ from sqlalchemy import and_, func, select
 from src.core.config import get_settings
 from src.core.db import session_scope
 from src.db.models import ReviewAnalysis, UnifiedReview
+from src.reports.prompts import REPORT_SUMMARY_SYSTEM_PROMPT, build_report_summary_user_prompt
 
 
 @dataclass
@@ -173,16 +174,12 @@ def _executive_summary(metrics: WeeklyMetrics) -> str:
 
     try:
         client = OpenAI(api_key=settings.openai_api_key)
-        prompt = (
-            "Escribe un resumen ejecutivo en un párrafo (max 450 caracteres) para gerencia. "
-            "Usa un tono profesional y accionable en español.\n"
-            f"Métricas: {asdict(metrics)}"
-        )
+        prompt = build_report_summary_user_prompt(asdict(metrics)) # type: ignore
         response = client.chat.completions.create(
             model=settings.openai_model,
             temperature=0.2,
             messages=[
-                {"role": "system", "content": "Eres un analista senior de operaciones."},
+                {"role": "system", "content": REPORT_SUMMARY_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -201,11 +198,11 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
         "total_reviews": metrics.total_reviews,
         "sentiment_distribution": metrics.sentiment_distribution,
         "top_rated_locations": [
-            {"location_id": loc, "avg_rating": round(avg, 2)}
+            {"location_id": loc, "avg_rating": round(avg, 2)}  # type: ignore
             for loc, avg in metrics.top_rated_locations
         ],
         "lowest_rated_locations": [
-            {"location_id": loc, "avg_rating": round(avg, 2)}
+            {"location_id": loc, "avg_rating": round(avg, 2)}  # type: ignore
             for loc, avg in metrics.lowest_rated_locations
         ],
         "top_problem_locations": [
@@ -1207,7 +1204,7 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
         c.setFillColorRGB(0.11, 0.20, 0.25)
         c.setFont("Helvetica-Bold", 12)
         c.drawString(margin, y, title)
-        y -= 16
+        y = y - 16
 
     # Header band
     header_height = 68
@@ -1301,14 +1298,14 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
         if not rows:
             ensure_space(14)
             c.drawString(margin, y, "- Sin datos en esta ventana.")
-            y -= 14
+            y = y - 14
             return
 
         for pos, (location_id, value) in enumerate(rows, start=1):
             ensure_space(14)
             c.drawString(margin, y, f"{pos}. Local {location_id}: {value_fmt.format(value)}")
-            y -= 13
-        y -= 4
+            y = y - 13
+        y = y - 4
 
     draw_rank_list(
         "Top 3 locales mejor valorados",
@@ -1329,7 +1326,7 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
     draw_section_title("Temas mas mencionados")
     c.setFillColorRGB(0.15, 0.15, 0.15)
     c.setFont("Helvetica", 10)
-    categories = list(metrics.category_frequency.items())[:6]
+    categories = list(metrics.category_frequency.items())[:6]  # type: ignore
     if not categories:
         c.drawString(margin, y, "- Sin categorias disponibles.")
         y -= 13
@@ -1348,10 +1345,10 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
         c.drawString(margin, y, "- Sin comentarios destacados en esta ventana.")
         y -= 13
     else:
-        for idx, sample in enumerate(metrics.comment_samples[:6], start=1):
+        for idx, sample in enumerate(metrics.comment_samples[:6], start=1):  # type: ignore
             ensure_space(30)
             text = str(sample["text"]).strip()
-            compact = text if len(text) <= 120 else f"{text[:117]}..."
+            compact = text if len(text) <= 120 else f"{text[:117]}..."  # type: ignore
             c.drawString(
                 margin,
                 y,

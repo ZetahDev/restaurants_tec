@@ -10,6 +10,10 @@ import httpx
 from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.alerts.prompts import (
+    ALERT_DIGEST_SUMMARY_SYSTEM_PROMPT,
+    build_alert_digest_summary_user_prompt,
+)
 from src.core.config import get_settings
 from src.db.models import Alert
 
@@ -84,14 +88,11 @@ def _ai_summary(
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "Eres un analista operativo. Devuelve un JSON valido con una sola clave `summary`. "
-                        "La respuesta debe ser 2 a 4 lineas en español, accionable, y sin markdown."
-                    ),
+                    "content": ALERT_DIGEST_SUMMARY_SYSTEM_PROMPT,
                 },
                 {
                     "role": "user",
-                    "content": f"Genera el resumen ejecutivo del lote con estos datos: {json.dumps(payload, ensure_ascii=False)}",
+                    "content": build_alert_digest_summary_user_prompt(payload),
                 },
             ],
             response_format={
