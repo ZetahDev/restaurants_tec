@@ -222,6 +222,8 @@ if [[ ! -f "${REPORT_HTML}" ]]; then
 fi
 
 REPORT_URL="http://${API_HOST}:${REPORT_PORT}/weekly_report.html"
+API_URL="${API_BASE_URL}"
+API_DOCS_URL="${API_BASE_URL}/docs"
 
 if curl -fsS "http://${API_HOST}:${REPORT_PORT}" >/dev/null 2>&1; then
   echo "[INFO] HTML server already running on port ${REPORT_PORT}"
@@ -231,24 +233,31 @@ else
   DOCS_PID="$!"
 fi
 
-if [[ "${OPEN_BROWSER}" == "true" ]]; then
+open_url() {
+  local url="$1"
   case "$(uname -s)" in
     Darwin)
-      open "${REPORT_URL}" >/dev/null 2>&1 || true
+      open "${url}" >/dev/null 2>&1 || true
       ;;
     MINGW*|MSYS*|CYGWIN*)
-      cmd.exe /c start "" "${REPORT_URL}" >/dev/null 2>&1 || true
+      cmd.exe /c start "" "${url}" >/dev/null 2>&1 || true
       ;;
     *)
       if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "${REPORT_URL}" >/dev/null 2>&1 || true
+        xdg-open "${url}" >/dev/null 2>&1 || true
       fi
       ;;
   esac
+}
+
+if [[ "${OPEN_BROWSER}" == "true" ]]; then
+  open_url "${REPORT_URL}"
+  open_url "${API_DOCS_URL}"
 fi
 
 echo
-echo "[READY] API: ${API_BASE_URL}"
+echo "[READY] API: ${API_URL}"
+echo "[READY] API Docs: ${API_DOCS_URL}"
 echo "[READY] Report: ${REPORT_URL}"
 echo "[READY] Logs: artifacts/api_server.log, artifacts/html_server.log"
 echo

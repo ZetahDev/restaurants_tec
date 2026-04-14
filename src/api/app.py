@@ -10,6 +10,20 @@ from src.api.data import generate_reviews
 app = FastAPI(title="FeedbackIQ Dummy API")
 
 
+@app.get("/")
+def root() -> dict[str, Any]:
+    return {
+        "service": "FeedbackIQ Dummy API",
+        "description": "Fuente A para reseñas de BrewMaster",
+        "docs_url": "/docs",
+        "openapi_url": "/openapi.json",
+        "endpoints": [
+            "GET /health",
+            "GET /api/reviews?location_id={id}&since={iso8601}",
+        ],
+    }
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}

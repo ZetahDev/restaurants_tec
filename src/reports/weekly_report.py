@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime, time, timedelta, timezone
 import json
 from pathlib import Path
+from textwrap import wrap
 from typing import Any
 
 from openai import OpenAI
@@ -26,6 +27,7 @@ class WeeklyMetrics:
     lowest_rated_locations: list[tuple[int, float]]
     top_problem_locations: list[tuple[int, int]]
     category_frequency: dict[str, int]
+    comment_samples: list[dict[str, Any]]
 
 
 @dataclass
@@ -105,6 +107,28 @@ def _collect_metrics(week_start: date | None = None) -> WeeklyMetrics:
             .where(and_(UnifiedReview.created_at >= start, UnifiedReview.created_at < end))
         ).all()
 
+        sample_rows = session.execute(
+            select(
+                UnifiedReview.location_id,
+                UnifiedReview.rating,
+                UnifiedReview.text,
+                UnifiedReview.created_at,
+                ReviewAnalysis.sentiment,
+                ReviewAnalysis.urgency,
+                ReviewAnalysis.summary,
+            )
+            .join(ReviewAnalysis, ReviewAnalysis.unified_review_id == UnifiedReview.id)
+            .where(
+                and_(
+                    UnifiedReview.created_at >= start,
+                    UnifiedReview.created_at < end,
+                    ReviewAnalysis.sentiment.in_(["negative", "neutral"]),
+                )
+            )
+            .order_by(ReviewAnalysis.urgency.desc(), UnifiedReview.created_at.desc())
+            .limit(8)
+        ).all()
+
     category_frequency: dict[str, int] = {}
     for (categories,) in category_rows:
         for category in categories:
@@ -121,6 +145,18 @@ def _collect_metrics(week_start: date | None = None) -> WeeklyMetrics:
         lowest_rated_locations=[(int(loc), float(avg)) for loc, avg in lowest_rated_locations],
         top_problem_locations=[(int(loc), int(count)) for loc, count in top_problem_locations],
         category_frequency=category_frequency,
+        comment_samples=[
+            {
+                "location_id": int(loc),
+                "rating": int(rating),
+                "text": str(text),
+                "created_at": created_at.isoformat(),
+                "sentiment": str(sentiment),
+                "urgency": int(urgency),
+                "summary": str(summary),
+            }
+            for loc, rating, text, created_at, sentiment, urgency, summary in sample_rows
+        ],
     )
 
 
@@ -177,6 +213,7 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
             for loc, count in metrics.top_problem_locations
         ],
         "category_frequency": metrics.category_frequency,
+        "comment_samples": metrics.comment_samples,
     }
     report_payload_json = json.dumps(report_payload, ensure_ascii=False)
 
@@ -543,6 +580,48 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
       font-size: 0.9rem;
     }}
 
+    .comment-list {{
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.75rem;
+    }}
+
+    .comment-item {{
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem;
+      background: #fffdf8;
+    }}
+
+    .comment-head {{
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }}
+
+    .comment-pill {{
+      border-radius: 999px;
+      padding: 0.12rem 0.45rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #f5efe4;
+    }}
+
+    .comment-text {{
+      margin: 0;
+      font-size: 0.92rem;
+      color: #21282c;
+    }}
+
     .bar-track {{
       position: relative;
       height: 10px;
@@ -779,6 +858,13 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
           </div>
           <ul class="category-list" id="categoryList"></ul>
         </section>
+
+        <section class="panel reveal delay-4">
+          <div class="panel-head">
+            <h2>Voz del cliente (muestras negativas y neutrales)</h2>
+          </div>
+          <ul class="comment-list" id="commentList"></ul>
+        </section>
       </main>
 
       <aside class="sidebar reveal delay-2">
@@ -1003,6 +1089,38 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
         }}).join("");
       }}
 
+      function renderCommentSamples(data) {{
+        const commentList = byId("commentList");
+        const rows = Array.isArray(data.comment_samples) ? data.comment_samples : [];
+
+        if (!rows.length) {{
+          commentList.innerHTML = `<li class="comment-item">No hay comentarios destacados en esta ventana.</li>`;
+          return;
+        }}
+
+        commentList.innerHTML = rows.map((row) => {{
+          const sentiment = String(row.sentiment || "").toUpperCase();
+          const createdAt = row.created_at
+            ? new Date(row.created_at).toLocaleString("es-CO", {{ hour12: false }})
+            : "--";
+          const text = String(row.text || "").trim();
+          const compactText = text.length > 180 ? `${{text.slice(0, 177)}}...` : text;
+          return `
+            <li class="comment-item">
+              <div class="comment-head">
+                <span>Local ${{row.location_id}} | Rating ${{row.rating}} | Urgencia ${{row.urgency}}</span>
+                <span class="comment-pill">${{sentiment}}</span>
+              </div>
+              <p class="comment-text">${{compactText}}</p>
+              <div class="comment-head" style="margin-top:0.45rem;">
+                <span>Resumen IA: ${{row.summary || "Sin resumen"}}</span>
+                <span>${{createdAt}}</span>
+              </div>
+            </li>
+          `;
+        }}).join("");
+      }}
+
       function rerunRevealAnimations() {{
         document.querySelectorAll(".reveal").forEach((element) => {{
           element.style.animation = "none";
@@ -1044,6 +1162,7 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
         renderSidebar(data);
         renderCategoryControls(data);
         renderCategories(data);
+        renderCommentSamples(data);
         renderMeta(data);
         wireInteractions(data);
       }}
@@ -1073,66 +1192,184 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
     c = canvas.Canvas(str(output_path), pagesize=A4)
     width, height = A4
 
-    y = height - 50
+    margin = 36
+    y = height - margin
+
+    def ensure_space(required: float) -> None:
+        nonlocal y
+        if y - required < margin:
+            c.showPage()
+            y = height - margin
+
+    def draw_section_title(title: str) -> None:
+        nonlocal y
+        ensure_space(24)
+        c.setFillColorRGB(0.11, 0.20, 0.25)
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(margin, y, title)
+        y -= 16
+
+    # Header band
+    header_height = 68
+    c.setFillColorRGB(0.10, 0.22, 0.26)
+    c.rect(0, height - header_height, width, header_height, fill=1, stroke=0)
+
+    c.setFillColorRGB(1, 1, 1)
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(40, y, "FeedbackIQ Weekly Report")
-    y -= 20
-
+    c.drawString(margin, height - 28, "BrewMaster | FeedbackIQ")
     c.setFont("Helvetica", 10)
-    c.drawString(40, y, f"Window: {metrics.week_start.isoformat()} -> {metrics.week_end.isoformat()}")
-    y -= 25
+    c.drawString(margin, height - 44, "Reporte semanal de experiencia de clientes")
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Executive Summary")
-    y -= 16
+    y = height - header_height - 14
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 9)
+    c.drawString(
+        margin,
+        y,
+        f"Ventana: {metrics.week_start.strftime('%Y-%m-%d %H:%M UTC')} -> {metrics.week_end.strftime('%Y-%m-%d %H:%M UTC')}",
+    )
+    y -= 18
 
+    # KPI cards
+    card_gap = 10
+    card_w = (width - (margin * 2) - (card_gap * 2)) / 3
+    card_h = 48
+    kpis = [
+        ("Total resenas", str(metrics.total_reviews)),
+        ("Sentimiento negativo", f"{metrics.sentiment_distribution['negative']:.2f}%"),
+        ("Sentimiento positivo", f"{metrics.sentiment_distribution['positive']:.2f}%"),
+    ]
+
+    ensure_space(card_h + 18)
+    for idx, (label, value) in enumerate(kpis):
+        x = margin + idx * (card_w + card_gap)
+        c.setFillColorRGB(0.96, 0.95, 0.92)
+        c.roundRect(x, y - card_h, card_w, card_h, 6, fill=1, stroke=0)
+        c.setFillColorRGB(0.33, 0.37, 0.41)
+        c.setFont("Helvetica", 8)
+        c.drawString(x + 8, y - 14, label)
+        c.setFillColorRGB(0.12, 0.17, 0.20)
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x + 8, y - 32, value)
+    y -= card_h + 16
+
+    # Executive summary
+    draw_section_title("Resumen ejecutivo")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
     c.setFont("Helvetica", 10)
-    for line in [summary[i:i + 95] for i in range(0, len(summary), 95)]:
-        c.drawString(40, y, line)
-        y -= 14
-
+    summary_lines = wrap(summary.strip() or "Sin resumen disponible.", width=100)
+    for line in summary_lines:
+        ensure_space(14)
+        c.drawString(margin, y, line)
+        y -= 13
     y -= 8
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Metrics")
-    y -= 16
 
+    # Sentiment chart (horizontal bars)
+    draw_section_title("Grafico de sentimiento (%)")
+    chart_x = margin
+    chart_w = width - (margin * 2)
+    bar_h = 12
+    bar_gap = 16
+    bars = [
+        ("Positivo", float(metrics.sentiment_distribution["positive"]), (0.18, 0.62, 0.27)),
+        ("Negativo", float(metrics.sentiment_distribution["negative"]), (0.71, 0.14, 0.09)),
+        ("Neutral", float(metrics.sentiment_distribution["neutral"]), (0.85, 0.47, 0.02)),
+    ]
+    ensure_space((bar_h + bar_gap) * len(bars) + 8)
+    for label, pct, color in bars:
+        c.setFillColorRGB(0.35, 0.40, 0.43)
+        c.setFont("Helvetica", 9)
+        c.drawString(chart_x, y, label)
+        track_x = chart_x + 68
+        track_w = chart_w - 130
+        c.setFillColorRGB(0.90, 0.90, 0.90)
+        c.rect(track_x, y - 8, track_w, bar_h, fill=1, stroke=0)
+        fill_w = max(0, min(track_w, track_w * (pct / 100.0)))
+        c.setFillColorRGB(*color)
+        c.rect(track_x, y - 8, fill_w, bar_h, fill=1, stroke=0)
+        c.setFillColorRGB(0.15, 0.15, 0.15)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawRightString(chart_x + chart_w, y, f"{pct:.2f}%")
+        y -= bar_h + bar_gap
+    y -= 2
+
+    def draw_rank_list(title: str, rows: list[tuple[int, float | int]], value_fmt: str) -> None:
+        nonlocal y
+        draw_section_title(title)
+        c.setFillColorRGB(0.15, 0.15, 0.15)
+        c.setFont("Helvetica", 10)
+        if not rows:
+            ensure_space(14)
+            c.drawString(margin, y, "- Sin datos en esta ventana.")
+            y -= 14
+            return
+
+        for pos, (location_id, value) in enumerate(rows, start=1):
+            ensure_space(14)
+            c.drawString(margin, y, f"{pos}. Local {location_id}: {value_fmt.format(value)}")
+            y -= 13
+        y -= 4
+
+    draw_rank_list(
+        "Top 3 locales mejor valorados",
+        metrics.top_rated_locations,
+        "{:.2f} de rating promedio",
+    )
+    draw_rank_list(
+        "Top 3 locales con menor rating",
+        metrics.lowest_rated_locations,
+        "{:.2f} de rating promedio",
+    )
+    draw_rank_list(
+        "Top 3 locales con mas problemas",
+        [(loc, count) for loc, count in metrics.top_problem_locations],
+        "{} resenas negativas",
+    )
+
+    draw_section_title("Temas mas mencionados")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
     c.setFont("Helvetica", 10)
-    c.drawString(40, y, f"Total reviews: {metrics.total_reviews}")
-    y -= 14
-    c.drawString(40, y, f"Positive: {metrics.sentiment_distribution['positive']}%")
-    y -= 14
-    c.drawString(40, y, f"Negative: {metrics.sentiment_distribution['negative']}%")
-    y -= 14
-    c.drawString(40, y, f"Neutral: {metrics.sentiment_distribution['neutral']}%")
-    y -= 20
+    categories = list(metrics.category_frequency.items())[:6]
+    if not categories:
+        c.drawString(margin, y, "- Sin categorias disponibles.")
+        y -= 13
+    else:
+        for category, mentions in categories:
+            ensure_space(14)
+            c.drawString(margin, y, f"- {category}: {mentions} menciones")
+            y -= 13
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Top rated locations")
-    y -= 16
-    c.setFont("Helvetica", 10)
-    for loc, avg in metrics.top_rated_locations:
-        c.drawString(40, y, f"- Location {loc}: {avg:.2f}")
-        y -= 14
+    y -= 4
+    draw_section_title("Voz del cliente (muestras negativas y neutrales)")
+    c.setFillColorRGB(0.15, 0.15, 0.15)
+    c.setFont("Helvetica", 9)
+    if not metrics.comment_samples:
+        ensure_space(14)
+        c.drawString(margin, y, "- Sin comentarios destacados en esta ventana.")
+        y -= 13
+    else:
+        for idx, sample in enumerate(metrics.comment_samples[:6], start=1):
+            ensure_space(30)
+            text = str(sample["text"]).strip()
+            compact = text if len(text) <= 120 else f"{text[:117]}..."
+            c.drawString(
+                margin,
+                y,
+                f"{idx}. Local {sample['location_id']} | {str(sample['sentiment']).upper()} | urg={sample['urgency']}",
+            )
+            y -= 12
+            c.drawString(margin + 10, y, compact)
+            y -= 14
 
-    y -= 8
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Lowest rated locations")
-    y -= 16
-    c.setFont("Helvetica", 10)
-    for loc, avg in metrics.lowest_rated_locations:
-        c.drawString(40, y, f"- Location {loc}: {avg:.2f}")
-        y -= 14
+    # Footer
+    c.setFont("Helvetica", 8)
+    c.setFillColorRGB(0.45, 0.45, 0.45)
+    c.drawRightString(
+        width - margin,
+        18,
+        f"Generado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+    )
 
-    y -= 8
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(40, y, "Top problem locations")
-    y -= 16
-    c.setFont("Helvetica", 10)
-    for loc, count in metrics.top_problem_locations:
-        c.drawString(40, y, f"- Location {loc}: {count} negative reviews")
-        y -= 14
-
-    c.showPage()
     c.save()
 
 

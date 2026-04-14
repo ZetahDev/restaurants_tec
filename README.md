@@ -19,7 +19,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - Includes a `prep-demo` command for deterministic presentation readiness.
 
 ## Architecture
-- `src/api`: dummy FastAPI source (`GET /api/reviews`).
+- `src/api`: dummy FastAPI source (`GET /api/reviews`) + docs in `/docs`.
 - `src/etl`: extractors, transformers, loader, ETL pipeline.
 - `src/analysis`: prompts, output schema, OpenAI analyzer with retries.
 - `src/alerts`: detector rules + digest notifier.
@@ -120,10 +120,11 @@ If Docker is not available, use this replacement for command 3:
 - The script will:
   - run migrations
   - start API service on `:8081`
+  - expose API docs on `http://127.0.0.1:8081/docs`
   - seed data
   - run `prep-demo`
   - serve `docs/weekly_report.html` on `:8090`
-  - open the report in your browser
+  - open report + API docs in your browser
 
 ### PostgreSQL requirement for technical evaluation
 - For the official PostgreSQL path, evaluators should run:

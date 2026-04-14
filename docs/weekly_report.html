@@ -360,6 +360,48 @@
       font-size: 0.9rem;
     }
 
+    .comment-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .comment-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem;
+      background: #fffdf8;
+    }
+
+    .comment-head {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .comment-pill {
+      border-radius: 999px;
+      padding: 0.12rem 0.45rem;
+      font-weight: 600;
+      font-size: 0.75rem;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #f5efe4;
+    }
+
+    .comment-text {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #21282c;
+    }
+
     .bar-track {
       position: relative;
       height: 10px;
@@ -596,6 +638,13 @@
           </div>
           <ul class="category-list" id="categoryList"></ul>
         </section>
+
+        <section class="panel reveal delay-4">
+          <div class="panel-head">
+            <h2>Voz del cliente (muestras negativas y neutrales)</h2>
+          </div>
+          <ul class="comment-list" id="commentList"></ul>
+        </section>
       </main>
 
       <aside class="sidebar reveal delay-2">
@@ -610,7 +659,7 @@
     <footer class="footer" id="footerMeta"></footer>
   </div>
 
-  <script id="report-data" type="application/json">{"generated_at": "2026-04-14T14:44:49.394661+00:00", "week_start": "2026-04-07T00:00:00+00:00", "week_end": "2026-04-14T00:00:00+00:00", "summary": "Se procesaron 345 reseñas en la semana. Sentimiento positivo 40.29%, negativo 35.94%.", "total_reviews": 345, "sentiment_distribution": {"positive": 40.29, "negative": 35.94, "neutral": 23.77}, "top_rated_locations": [{"location_id": 6, "avg_rating": 3.59}, {"location_id": 13, "avg_rating": 3.5}, {"location_id": 2, "avg_rating": 3.5}], "lowest_rated_locations": [{"location_id": 9, "avg_rating": 2.41}, {"location_id": 11, "avg_rating": 2.48}, {"location_id": 14, "avg_rating": 2.71}], "top_problem_locations": [{"location_id": 2, "negative_count": 13}, {"location_id": 5, "negative_count": 12}, {"location_id": 7, "negative_count": 10}], "category_frequency": {"servicio": 175, "producto": 121, "ambiente": 74, "precio": 41, "otro": 37, "limpieza": 32}}</script>
+  <script id="report-data" type="application/json">{"generated_at": "2026-04-14T15:26:59.429746+00:00", "week_start": "2026-04-07T00:00:00+00:00", "week_end": "2026-04-14T00:00:00+00:00", "summary": "Durante la semana del 7 al 14 de abril de 2026, se registraron 345 reseñas, con una distribución de sentimientos que muestra un 40.29% de comentarios positivos y un 35.94% negativos. Las principales quejas se centraron en el servicio (175 menciones) y la calidad del producto. Las ubicaciones con mejor calificación fueron 6, 13 y 2, mientras que las de menor calificación fueron 9, 11 y 14. Se recomienda priorizar mejoras en las áreas de servicio y limpieza para abordar las preocupaciones de los clientes y optimizar la experiencia general.", "total_reviews": 345, "sentiment_distribution": {"positive": 40.29, "negative": 35.94, "neutral": 23.77}, "top_rated_locations": [{"location_id": 6, "avg_rating": 3.59}, {"location_id": 13, "avg_rating": 3.5}, {"location_id": 2, "avg_rating": 3.5}], "lowest_rated_locations": [{"location_id": 9, "avg_rating": 2.41}, {"location_id": 11, "avg_rating": 2.48}, {"location_id": 14, "avg_rating": 2.71}], "top_problem_locations": [{"location_id": 2, "negative_count": 13}, {"location_id": 5, "negative_count": 12}, {"location_id": 7, "negative_count": 10}], "category_frequency": {"servicio": 175, "producto": 121, "ambiente": 74, "precio": 41, "otro": 37, "limpieza": 32}, "comment_samples": [{"location_id": 8, "rating": 1, "text": "The place was noisy and the wait was long.", "created_at": "2026-04-13T22:49:14.340513", "sentiment": "negative", "urgency": 4, "summary": "El lugar estaba ruidoso y la espera fue larga."}, {"location_id": 4, "rating": 1, "text": "The place was noisy and the wait was long.", "created_at": "2026-04-13T22:49:14.331867", "sentiment": "negative", "urgency": 4, "summary": "El lugar era ruidoso y la espera fue larga."}, {"location_id": 12, "rating": 4, "text": "The product quality dropped since my last visit.", "created_at": "2026-04-13T14:49:14.348064", "sentiment": "negative", "urgency": 4, "summary": "La calidad del producto ha bajado desde mi última visita."}, {"location_id": 7, "rating": 1, "text": "Too expensive for what you get.", "created_at": "2026-04-13T14:49:14.338100", "sentiment": "negative", "urgency": 4, "summary": "Demasiado caro para lo que se ofrece."}, {"location_id": 5, "rating": 1, "text": "Good flavor but the coffee arrived cold.", "created_at": "2026-04-13T14:49:14.334023", "sentiment": "negative", "urgency": 4, "summary": "El café llegó frío a pesar de tener buen sabor."}, {"location_id": 4, "rating": 4, "text": "Too expensive for what you get.", "created_at": "2026-04-13T14:49:14.331867", "sentiment": "negative", "urgency": 4, "summary": "Demasiado caro para lo que se ofrece."}, {"location_id": 2, "rating": 2, "text": "The place was dirty and noisy.", "created_at": "2026-04-13T14:40:34.192281", "sentiment": "negative", "urgency": 4, "summary": "El lugar estaba sucio y ruidoso."}, {"location_id": 14, "rating": 4, "text": "The counter area was not clean.", "created_at": "2026-04-13T06:49:14.351420", "sentiment": "negative", "urgency": 4, "summary": "El área del mostrador no estaba limpia."}]}</script>
   <script>
     (() => {
       const state = {
@@ -820,6 +869,38 @@
         }).join("");
       }
 
+      function renderCommentSamples(data) {
+        const commentList = byId("commentList");
+        const rows = Array.isArray(data.comment_samples) ? data.comment_samples : [];
+
+        if (!rows.length) {
+          commentList.innerHTML = `<li class="comment-item">No hay comentarios destacados en esta ventana.</li>`;
+          return;
+        }
+
+        commentList.innerHTML = rows.map((row) => {
+          const sentiment = String(row.sentiment || "").toUpperCase();
+          const createdAt = row.created_at
+            ? new Date(row.created_at).toLocaleString("es-CO", { hour12: false })
+            : "--";
+          const text = String(row.text || "").trim();
+          const compactText = text.length > 180 ? `${text.slice(0, 177)}...` : text;
+          return `
+            <li class="comment-item">
+              <div class="comment-head">
+                <span>Local ${row.location_id} | Rating ${row.rating} | Urgencia ${row.urgency}</span>
+                <span class="comment-pill">${sentiment}</span>
+              </div>
+              <p class="comment-text">${compactText}</p>
+              <div class="comment-head" style="margin-top:0.45rem;">
+                <span>Resumen IA: ${row.summary || "Sin resumen"}</span>
+                <span>${createdAt}</span>
+              </div>
+            </li>
+          `;
+        }).join("");
+      }
+
       function rerunRevealAnimations() {
         document.querySelectorAll(".reveal").forEach((element) => {
           element.style.animation = "none";
@@ -861,6 +942,7 @@
         renderSidebar(data);
         renderCategoryControls(data);
         renderCategories(data);
+        renderCommentSamples(data);
         renderMeta(data);
         wireInteractions(data);
       }
