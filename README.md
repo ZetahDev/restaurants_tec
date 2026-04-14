@@ -3,46 +3,53 @@
 Intelligent review consolidation and analysis pipeline for the BrewMaster technical challenge.
 
 ## ES - Qué resuelve
-- Consolida reseñas desde 2 fuentes (`API` + `customer_surveys`).
-- Ejecuta ETL idempotente con `upsert` y control de errores por `dead_letter_events`.
-- Analiza reseñas con LLM (salida estructurada) y guarda en `review_analysis`.
-- Genera alertas automáticas (`CRITICA`, `ALTA`, `MEDIA`) con deduplicación por ventana.
-- Publica reporte semanal en HTML y PDF.
+- Consolida reseñas desde API + encuestas.
+- Ejecuta ETL idempotente con `upsert` y `dead_letter_events`.
+- Analiza reseñas con LLM en salida estructurada validada.
+- Genera alertas deduplicadas y notifica por Slack en formato digest legible.
+- Produce reporte semanal en HTML/PDF.
+- Incluye comando de preparación de demo (`prep-demo`) para estado de presentación.
 
 ## EN - What it delivers
-- Consolidates reviews from two sources (`API` + `customer_surveys`).
-- Runs idempotent ETL with `upsert` and dead-letter handling.
-- Performs structured LLM analysis and persists results in `review_analysis`.
-- Generates automatic alerts (`CRITICA`, `ALTA`, `MEDIA`) with window-based dedupe.
-- Produces weekly report in HTML and PDF.
+- Consolidates reviews from API + survey sources.
+- Runs idempotent ETL with upsert and dead-letter handling.
+- Performs structured LLM analysis with schema validation.
+- Generates deduplicated alerts and readable Slack digest notifications.
+- Produces weekly HTML/PDF report.
+- Includes a `prep-demo` command for deterministic presentation readiness.
 
 ## Architecture
 - `src/api`: dummy FastAPI source (`GET /api/reviews`).
-- `src/etl`: extractors, transformers, loader, ETL orchestration.
-- `src/analysis`: prompts, schema, OpenAI analyzer with retry/backoff.
-- `src/alerts`: detector rules and notifier (Slack + JSON fallback).
-- `src/reports`: weekly metrics + HTML/PDF generation.
-- `src/scripts`: seed utilities.
+- `src/etl`: extractors, transformers, loader, ETL pipeline.
+- `src/analysis`: prompts, output schema, OpenAI analyzer with retries.
+- `src/alerts`: detector rules + digest notifier.
+- `src/reports`: weekly metrics + HTML/PDF rendering.
+- `src/scripts`: seed + prep-demo orchestration.
 
-## Database model
+## Core data model
 - `customer_surveys`
 - `unified_reviews` (`UNIQUE(source, source_review_id)`)
 - `review_analysis` (`UNIQUE(unified_review_id)`)
 - `alerts` (`UNIQUE(rule_code, location_id, window_start, window_end)`)
 - `dead_letter_events`
 
-## 5-step run (Docker-first)
-1. Copy env values:
-   - `cp .env.example .env`
-2. Install dependencies:
-   - `uv sync --extra dev`
-3. Start infrastructure:
-   - `docker compose up -d postgres reviews_api`
-4. Apply migrations and seed:
+## Run Path A (Docker evaluator path)
+1. `cp .env.example .env`
+2. `uv sync --extra dev`
+3. `docker compose up -d postgres reviews_api`
+4. `uv run alembic upgrade head`
+5. `uv run python -m src.main seed --total 220`
+6. `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
+
+## Run Path B (No Docker / local SQLite)
+1. `cp .env.example .env`
+2. `uv sync --extra dev`
+3. `export DATABASE_URL=sqlite:///./feedbackiq.db`
+4. Terminal A: `uv run uvicorn src.api.app:app --host 127.0.0.1 --port 8081`
+5. Terminal B:
    - `uv run alembic upgrade head`
    - `uv run python -m src.main seed --total 220`
-5. Execute pipeline:
-   - `uv run python -m src.main run-all --analyze-limit 100`
+   - `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
 
 ## CLI reference
 - `uv run python -m src.main seed --total 220`
@@ -51,6 +58,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - `uv run python -m src.main alerts --now 2026-04-14T12:00:00+00:00`
 - `uv run python -m src.main report --week-start 2026-04-07`
 - `uv run python -m src.main run-all --analyze-limit 100`
+- `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
 
 ## Testing
 - `uv run pytest -q`
@@ -64,13 +72,19 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - `TIMEZONE`
 
 ## Troubleshooting
-- `docker: command not found`:
-  - Install Docker Desktop and rerun `docker compose` commands.
 - `OPENAI_API_KEY is not set`:
-  - Analysis stage is skipped by design for local offline execution.
-- No Slack webhook configured:
-  - Notifications are written to `artifacts/alerts_webhook_fallback.jsonl`.
+  - Analysis stage is skipped by design.
+- Slack webhook missing/failing:
+  - Digest payload is written to `artifacts/alerts_webhook_fallback.jsonl`.
+- Want a clean demo state:
+  - Use `prep-demo` to backfill analysis, archive/clean dead letters, run alerts, and regenerate report.
+
+## Included evidence artifacts
+- `docs/weekly_report.html`
+- `docs/weekly_report.pdf`
+- `docs/OPERATIONS.md`
+- `docs/LEARNING_SUMMARY.md`
 
 ## Notes
-- Private learning files live in `.private/` and are excluded via `.gitignore`.
-- Commit history follows descriptive English commit messages per milestone.
+- Private learning files live in `.private/` and are intentionally excluded from git.
+- Commit history uses descriptive English messages by milestone.

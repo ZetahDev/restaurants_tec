@@ -6,8 +6,18 @@
 3. Levantar API dummy: `uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8081`
 4. Ejecutar ETL: `uv run python -m src.main etl`
 5. Ejecutar análisis: `uv run python -m src.main analyze --limit 100`
-6. Ejecutar alertas: `uv run python -m src.main alerts`
+6. Ejecutar alertas (digest): `uv run python -m src.main alerts`
 7. Generar reporte: `uv run python -m src.main report`
+
+## ES - Preparación de demo
+`uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
+
+Qué hace `prep-demo`:
+- backfill de análisis por lotes hasta converger o agotar máximo de iteraciones,
+- snapshot de dead letters en `artifacts/dead_letters_snapshot_<timestamp>.json`,
+- limpieza opcional de dead letters,
+- ejecución de alertas + reporte,
+- impresión de resumen final de readiness.
 
 ## EN - Daily operation
 1. Apply migrations: `uv run alembic upgrade head`
@@ -15,7 +25,7 @@
 3. Run dummy API: `uv run uvicorn src.api.app:app --host 0.0.0.0 --port 8081`
 4. Run ETL: `uv run python -m src.main etl`
 5. Run analysis: `uv run python -m src.main analyze --limit 100`
-6. Run alerts: `uv run python -m src.main alerts`
+6. Run alerts (digest): `uv run python -m src.main alerts`
 7. Generate report: `uv run python -m src.main report`
 
 ## Alert rules
@@ -33,3 +43,4 @@
 - Report HTML: `docs/weekly_report.html`
 - Report PDF: `docs/weekly_report.pdf`
 - Alert fallback: `artifacts/alerts_webhook_fallback.jsonl`
+- Dead-letter snapshots: `artifacts/dead_letters_snapshot_<timestamp>.json`
