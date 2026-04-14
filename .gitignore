@@ -20,6 +20,7 @@ artifacts/
 
 # OS
 .DS_Store
+.vscode/
 
 # Build/distribution
 build/
