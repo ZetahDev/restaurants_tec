@@ -106,7 +106,7 @@ def summarize_usage(path: str | Path = DEFAULT_USAGE_PATH, since_hours: int | No
         events,
         key=lambda item: int(item.get("total_tokens", 0)),
         reverse=True,
-    )[:5]
+    )[:5]  # type: ignore
 
     created_at_values = [datetime.fromisoformat(event["created_at"]) for event in events]
     window_start = min(created_at_values).isoformat() if created_at_values else None
@@ -120,7 +120,7 @@ def summarize_usage(path: str | Path = DEFAULT_USAGE_PATH, since_hours: int | No
         "total_prompt_tokens": total_prompt,
         "total_completion_tokens": total_completion,
         "total_tokens": total_tokens,
-        "avg_total_tokens_per_event": round(total_tokens / event_count, 2) if event_count else 0.0,
+        "avg_total_tokens_per_event": round(total_tokens / event_count, 2) if event_count else 0.0,  # type: ignore
         "models": models,
         "window_start": window_start,
         "window_end": window_end,
