@@ -5,11 +5,13 @@ from datetime import date, datetime
 
 from src.alerts.detector import run_alert_detection
 from src.analysis.llm_analyzer import analyze_pending_reviews
+from src.analysis.usage_tracker import summarize_usage
 from src.core.db import session_scope
 from src.etl.pipeline import run_etl
 from src.reports.weekly_report import generate_weekly_report
 from src.scripts.prep_demo import run_prep_demo, stats_to_json
 from src.scripts.seed import seed_customer_surveys
+import json
 
 
 def _str_to_bool(value: str) -> bool:
@@ -47,6 +49,10 @@ def build_parser() -> argparse.ArgumentParser:
     prep_demo_parser.add_argument("--batch-size", type=int, default=100)
     prep_demo_parser.add_argument("--max-batches", type=int, default=20)
     prep_demo_parser.add_argument("--clean-dead-letters", type=_str_to_bool, default=True)
+
+    usage_parser = subparsers.add_parser("llm-usage", help="Summarize LLM token usage events")
+    usage_parser.add_argument("--since-hours", type=int, default=None)
+    usage_parser.add_argument("--path", type=str, default="artifacts/llm_usage.jsonl")
 
     return parser
 
@@ -119,6 +125,11 @@ def cmd_prep_demo(batch_size: int, max_batches: int, clean_dead_letters: bool) -
     print(stats_to_json(stats))
 
 
+def cmd_llm_usage(path: str, since_hours: int | None) -> None:
+    summary = summarize_usage(path=path, since_hours=since_hours)
+    print(json.dumps(summary, ensure_ascii=True, indent=2))
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -153,6 +164,10 @@ def main() -> None:
             max_batches=args.max_batches,
             clean_dead_letters=args.clean_dead_letters,
         )
+        return
+
+    if args.command == "llm-usage":
+        cmd_llm_usage(path=args.path, since_hours=args.since_hours)
         return
 
     raise ValueError(f"Unsupported command: {args.command}")

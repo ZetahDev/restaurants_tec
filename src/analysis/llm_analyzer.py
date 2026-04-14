@@ -13,6 +13,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from src.analysis.prompts import SYSTEM_PROMPT
 from src.analysis.schemas import ReviewAnalysisOutput
+from src.analysis.usage_tracker import LLMUsageEvent, write_usage_event
 from src.core.config import get_settings
 from src.core.db import session_scope
 from src.db.models import ReviewAnalysis, UnifiedReview
@@ -42,7 +43,7 @@ def _analysis_insert_statement(dialect: str):
     retry=retry_if_exception_type((RateLimitError, APITimeoutError, APIConnectionError, APIStatusError)),
     reraise=True,
 )
-def _request_analysis(client: OpenAI, model: str, review_text: str, rating: int) -> ReviewAnalysisOutput:
+def _request_analysis(client: OpenAI, model: str, review_text: str, rating: int) -> tuple[ReviewAnalysisOutput, dict[str, int | str]]:
     schema = ReviewAnalysisOutput.model_json_schema()
     user_prompt = (
         "Analyze this customer review and produce structured output.\n"
@@ -69,7 +70,18 @@ def _request_analysis(client: OpenAI, model: str, review_text: str, rating: int)
 
     content = response.choices[0].message.content or "{}"
     data = json.loads(content)
-    return ReviewAnalysisOutput.model_validate(data)
+    output = ReviewAnalysisOutput.model_validate(data)
+    usage = response.usage
+    prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+    completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+    total_tokens = int(getattr(usage, "total_tokens", prompt_tokens + completion_tokens) or (prompt_tokens + completion_tokens))
+
+    return output, {
+        "model": str(response.model or model),
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens": total_tokens,
+    }
 
 
 def _upsert_review_analysis(session, unified_review_id: int, analysis: ReviewAnalysisOutput) -> None:
@@ -126,9 +138,26 @@ def analyze_pending_reviews(limit: int = 100) -> AnalysisStats:
                     review_text=review.text,
                     rating=review.rating,
                 )
+                parsed_analysis, usage = analysis
                 stats.analyzed += 1
-                _upsert_review_analysis(session=session, unified_review_id=review.id, analysis=analysis)
+                _upsert_review_analysis(session=session, unified_review_id=review.id, analysis=parsed_analysis)
                 stats.stored += 1
+                write_usage_event(
+                    LLMUsageEvent(
+                        created_at=datetime.now(timezone.utc).isoformat(),
+                        stage="analysis",
+                        model=usage["model"],
+                        prompt_tokens=int(usage["prompt_tokens"]),
+                        completion_tokens=int(usage["completion_tokens"]),
+                        total_tokens=int(usage["total_tokens"]),
+                        unified_review_id=int(review.id),
+                        source=str(review.source),
+                        source_review_id=str(review.source_review_id),
+                        location_id=int(review.location_id),
+                        rating=int(review.rating),
+                        text_length=len(review.text),
+                    )
+                )
             except (ValidationError, json.JSONDecodeError, RateLimitError, APITimeoutError, APIConnectionError, APIStatusError, Exception) as exc:
                 write_dead_letter(
                     session=session,

@@ -51,6 +51,28 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
    - `uv run python -m src.main seed --total 220`
    - `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
 
+## One-command demo launcher (macOS + Windows Git Bash)
+- Make sure `.env` exists (`cp .env.example .env`) and `uv` is installed.
+- Run:
+  - `./scripts/start_demo.sh --sync`
+  - batch mode (CI/demo loop): `./scripts/start_demo.sh --sync --exit-after-ready --no-open-browser`
+- Behavior:
+  - If `DATABASE_URL` points to PostgreSQL and the server is up, it runs with PostgreSQL (evaluator path).
+  - If PostgreSQL is configured but not reachable, it automatically falls back to SQLite (`sqlite:///./feedbackiq.db`) so local demo can continue.
+  - To force strict PostgreSQL-only execution: add `--no-sqlite-fallback`.
+- The script will:
+  - run migrations
+  - start API service on `:8081`
+  - seed data
+  - run `prep-demo`
+  - serve `docs/weekly_report.html` on `:8090`
+  - open the report in your browser
+
+### PostgreSQL requirement for technical evaluation
+- For the official PostgreSQL path, evaluators should run:
+  - `docker compose up -d postgres reviews_api`
+  - then `./scripts/start_demo.sh --sync --no-sqlite-fallback`
+
 ## CLI reference
 - `uv run python -m src.main seed --total 220`
 - `uv run python -m src.main etl --since 2026-04-10T00:00:00+00:00`
@@ -62,6 +84,20 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 
 ## Testing
 - `uv run pytest -q`
+
+## LLM token observability
+- Every successful analysis call stores one usage event in:
+  - `artifacts/llm_usage.jsonl`
+- Event includes:
+  - timestamp, model, prompt/completion/total tokens
+  - review context (`unified_review_id`, `source`, `location_id`, rating, text length)
+- Usage summary command:
+  - `uv run python -m src.main llm-usage`
+  - `uv run python -m src.main llm-usage --since-hours 24`
+- This is the recommended proof for:
+  - how many tokens were consumed
+  - where consumption is concentrated
+  - whether LLM usage remains stable across runs
 
 ## Environment variables
 - `DATABASE_URL`
@@ -84,6 +120,7 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
 - `docs/weekly_report.pdf`
 - `docs/OPERATIONS.md`
 - `docs/LEARNING_SUMMARY.md`
+- `docs/TECHNICAL_EVALUATION_CHECKLIST.md`
 
 ## Notes
 - Private learning files live in `.private/` and are intentionally excluded from git.
