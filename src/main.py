@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime
 
+from src.analysis.llm_analyzer import analyze_pending_reviews
 from src.core.db import session_scope
 from src.etl.pipeline import run_etl
 from src.scripts.seed import seed_customer_surveys
@@ -18,7 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     etl_parser = subparsers.add_parser("etl", help="Run ETL pipeline")
     etl_parser.add_argument("--since", type=str, default=None, help="ISO-8601 UTC timestamp")
 
-    for command in ("analyze", "alerts", "report", "run-all"):
+    analyze_parser = subparsers.add_parser("analyze", help="Run LLM analysis for pending reviews")
+    analyze_parser.add_argument("--limit", type=int, default=100)
+
+    for command in ("alerts", "report", "run-all"):
         subparsers.add_parser(command)
 
     return parser
@@ -44,6 +48,18 @@ def cmd_etl(since: str | None) -> None:
             print(f"- {err}")
 
 
+def cmd_analyze(limit: int) -> None:
+    stats = analyze_pending_reviews(limit=limit)
+    print(
+        "Analysis complete | "
+        f"pending={stats.pending} analyzed={stats.analyzed} stored={stats.stored} dead_letters={stats.dead_letters}"
+    )
+    if stats.errors:
+        print("Errors:")
+        for err in stats.errors:
+            print(f"- {err}")
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -54,6 +70,10 @@ def main() -> None:
 
     if args.command == "etl":
         cmd_etl(since=args.since)
+        return
+
+    if args.command == "analyze":
+        cmd_analyze(limit=args.limit)
         return
 
     print(f"Command '{args.command}' is scaffolded and will be implemented in next commits.")
