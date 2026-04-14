@@ -23,6 +23,7 @@ class WeeklyMetrics:
     total_reviews: int
     sentiment_distribution: dict[str, float]
     top_rated_locations: list[tuple[int, float]]
+    lowest_rated_locations: list[tuple[int, float]]
     top_problem_locations: list[tuple[int, int]]
     category_frequency: dict[str, int]
 
@@ -90,6 +91,14 @@ def _collect_metrics(week_start: date | None = None) -> WeeklyMetrics:
             .limit(3)
         ).all()
 
+        lowest_rated_locations = session.execute(
+            select(UnifiedReview.location_id, func.avg(UnifiedReview.rating).label("avg_rating"))
+            .where(and_(UnifiedReview.created_at >= start, UnifiedReview.created_at < end))
+            .group_by(UnifiedReview.location_id)
+            .order_by(func.avg(UnifiedReview.rating).asc())
+            .limit(3)
+        ).all()
+
         category_rows = session.execute(
             select(ReviewAnalysis.categories)
             .join(UnifiedReview, UnifiedReview.id == ReviewAnalysis.unified_review_id)
@@ -109,6 +118,7 @@ def _collect_metrics(week_start: date | None = None) -> WeeklyMetrics:
         total_reviews=int(total_reviews),
         sentiment_distribution=sentiment_distribution,
         top_rated_locations=[(int(loc), float(avg)) for loc, avg in top_rated_locations],
+        lowest_rated_locations=[(int(loc), float(avg)) for loc, avg in lowest_rated_locations],
         top_problem_locations=[(int(loc), int(count)) for loc, count in top_problem_locations],
         category_frequency=category_frequency,
     )
@@ -157,6 +167,10 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
         "top_rated_locations": [
             {"location_id": loc, "avg_rating": round(avg, 2)}
             for loc, avg in metrics.top_rated_locations
+        ],
+        "lowest_rated_locations": [
+            {"location_id": loc, "avg_rating": round(avg, 2)}
+            for loc, avg in metrics.lowest_rated_locations
         ],
         "top_problem_locations": [
             {"location_id": loc, "negative_count": count}
@@ -648,7 +662,7 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
   <div class="page">
     <header class="workspace-header">
       <div class="workspace-header-top">
-        <div class="brand">FeedbackIQ Ops</div>
+        <div class="brand">BrewMaster | FeedbackIQ Ops</div>
         <div class="timestamp" id="generatedAt">Actualizado: --</div>
       </div>
       <h1>Reporte semanal de reseñas y riesgo operativo</h1>
@@ -703,7 +717,7 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
 
         <section class="panel reveal delay-3">
           <div class="panel-head">
-            <h2>Ubicaciones clave de la semana</h2>
+            <h2>Top 3 por desempeño (rating promedio)</h2>
           </div>
           <div class="two-columns">
             <div class="table-wrap">
@@ -718,6 +732,24 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
               </table>
             </div>
             <div class="table-wrap">
+              <table aria-label="Ubicaciones con menor rating">
+                <thead>
+                  <tr>
+                    <th>Top más bajas</th>
+                    <th>Promedio</th>
+                  </tr>
+                </thead>
+                <tbody id="lowestRatedBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal delay-4">
+          <div class="panel-head">
+            <h2>Top 3 locales con más problemas</h2>
+          </div>
+          <div class="table-wrap">
               <table aria-label="Ubicaciones con más negativas">
                 <thead>
                   <tr>
@@ -727,7 +759,6 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
                 </thead>
                 <tbody id="topProblemBody"></tbody>
               </table>
-            </div>
           </div>
         </section>
 
@@ -872,10 +903,17 @@ def _render_html(metrics: WeeklyMetrics, summary: str, output_path: Path) -> Non
 
       function renderTables(data) {{
         const rated = Array.isArray(data.top_rated_locations) ? data.top_rated_locations : [];
+        const lowest = Array.isArray(data.lowest_rated_locations) ? data.lowest_rated_locations : [];
         const problem = Array.isArray(data.top_problem_locations) ? data.top_problem_locations : [];
 
         byId("topRatedBody").innerHTML = tableRows(
           rated,
+          "location_id",
+          "avg_rating",
+          (value) => Number(value).toFixed(2),
+        );
+        byId("lowestRatedBody").innerHTML = tableRows(
+          lowest,
           "location_id",
           "avg_rating",
           (value) => Number(value).toFixed(2),
@@ -1073,6 +1111,15 @@ def _render_pdf(metrics: WeeklyMetrics, summary: str, output_path: Path) -> None
     y -= 16
     c.setFont("Helvetica", 10)
     for loc, avg in metrics.top_rated_locations:
+        c.drawString(40, y, f"- Location {loc}: {avg:.2f}")
+        y -= 14
+
+    y -= 8
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(40, y, "Lowest rated locations")
+    y -= 16
+    c.setFont("Helvetica", 10)
+    for loc, avg in metrics.lowest_rated_locations:
         c.drawString(40, y, f"- Location {loc}: {avg:.2f}")
         y -= 14
 

@@ -479,7 +479,7 @@
   <div class="page">
     <header class="workspace-header">
       <div class="workspace-header-top">
-        <div class="brand">FeedbackIQ Ops</div>
+        <div class="brand">BrewMaster | FeedbackIQ Ops</div>
         <div class="timestamp" id="generatedAt">Actualizado: --</div>
       </div>
       <h1>Reporte semanal de reseñas y riesgo operativo</h1>
@@ -534,7 +534,7 @@
 
         <section class="panel reveal delay-3">
           <div class="panel-head">
-            <h2>Ubicaciones clave de la semana</h2>
+            <h2>Top 3 por desempeño (rating promedio)</h2>
           </div>
           <div class="two-columns">
             <div class="table-wrap">
@@ -549,6 +549,24 @@
               </table>
             </div>
             <div class="table-wrap">
+              <table aria-label="Ubicaciones con menor rating">
+                <thead>
+                  <tr>
+                    <th>Top más bajas</th>
+                    <th>Promedio</th>
+                  </tr>
+                </thead>
+                <tbody id="lowestRatedBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel reveal delay-4">
+          <div class="panel-head">
+            <h2>Top 3 locales con más problemas</h2>
+          </div>
+          <div class="table-wrap">
               <table aria-label="Ubicaciones con más negativas">
                 <thead>
                   <tr>
@@ -558,7 +576,6 @@
                 </thead>
                 <tbody id="topProblemBody"></tbody>
               </table>
-            </div>
           </div>
         </section>
 
@@ -593,7 +610,7 @@
     <footer class="footer" id="footerMeta"></footer>
   </div>
 
-  <script id="report-data" type="application/json">{"generated_at": "2026-04-14T04:36:45.214451+00:00", "week_start": "2026-04-07T00:00:00+00:00", "week_end": "2026-04-14T00:00:00+00:00", "summary": "Durante la semana del 7 al 14 de abril de 2026, se registraron 363 reseñas, con una distribución de sentimientos que muestra un 40.5% de comentarios positivos, 35.54% negativos y 23.97% neutrales. Las principales áreas de mejora se centran en el servicio y producto, con 187 y 129 menciones respectivamente. Las ubicaciones mejor valoradas incluyen la número 6, mientras que las más problemáticas son la 2, 5 y 7. Se recomienda implementar acciones correctivas en estas áreas para mejorar la satisfacción del cliente y optimizar la experiencia general.", "total_reviews": 363, "sentiment_distribution": {"positive": 40.5, "negative": 35.54, "neutral": 23.97}, "top_rated_locations": [{"location_id": 6, "avg_rating": 3.57}, {"location_id": 12, "avg_rating": 3.52}, {"location_id": 2, "avg_rating": 3.48}], "top_problem_locations": [{"location_id": 2, "negative_count": 13}, {"location_id": 5, "negative_count": 12}, {"location_id": 7, "negative_count": 11}], "category_frequency": {"servicio": 187, "producto": 129, "ambiente": 80, "precio": 43, "otro": 38, "limpieza": 32}}</script>
+  <script id="report-data" type="application/json">{"generated_at": "2026-04-14T14:44:49.394661+00:00", "week_start": "2026-04-07T00:00:00+00:00", "week_end": "2026-04-14T00:00:00+00:00", "summary": "Se procesaron 345 reseñas en la semana. Sentimiento positivo 40.29%, negativo 35.94%.", "total_reviews": 345, "sentiment_distribution": {"positive": 40.29, "negative": 35.94, "neutral": 23.77}, "top_rated_locations": [{"location_id": 6, "avg_rating": 3.59}, {"location_id": 13, "avg_rating": 3.5}, {"location_id": 2, "avg_rating": 3.5}], "lowest_rated_locations": [{"location_id": 9, "avg_rating": 2.41}, {"location_id": 11, "avg_rating": 2.48}, {"location_id": 14, "avg_rating": 2.71}], "top_problem_locations": [{"location_id": 2, "negative_count": 13}, {"location_id": 5, "negative_count": 12}, {"location_id": 7, "negative_count": 10}], "category_frequency": {"servicio": 175, "producto": 121, "ambiente": 74, "precio": 41, "otro": 37, "limpieza": 32}}</script>
   <script>
     (() => {
       const state = {
@@ -703,10 +720,17 @@
 
       function renderTables(data) {
         const rated = Array.isArray(data.top_rated_locations) ? data.top_rated_locations : [];
+        const lowest = Array.isArray(data.lowest_rated_locations) ? data.lowest_rated_locations : [];
         const problem = Array.isArray(data.top_problem_locations) ? data.top_problem_locations : [];
 
         byId("topRatedBody").innerHTML = tableRows(
           rated,
+          "location_id",
+          "avg_rating",
+          (value) => Number(value).toFixed(2),
+        );
+        byId("lowestRatedBody").innerHTML = tableRows(
+          lowest,
           "location_id",
           "avg_rating",
           (value) => Number(value).toFixed(2),
