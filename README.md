@@ -51,6 +51,63 @@ Intelligent review consolidation and analysis pipeline for the BrewMaster techni
    - `uv run python -m src.main seed --total 220`
    - `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
 
+## Final Delivery Flow (10 Commands, PostgreSQL Evaluator Path)
+### ES
+Ejecuta estos 10 comandos exactamente en este orden:
+1. `cp .env.example .env`
+2. `uv sync --extra dev`
+3. `docker compose up -d postgres reviews_api`
+4. `uv run alembic upgrade head`
+5. `uv run python -m src.main seed --total 220`
+6. `uv run python -m src.main etl`
+7. `uv run python -m src.main analyze --limit 3`
+8. `uv run python -m src.main llm-usage --since-hours 24`
+9. `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
+10. `uv run pytest -q`
+
+Qué valida cada comando:
+1. Crea entorno base reproducible.
+2. Asegura dependencias y herramientas.
+3. Levanta fuentes obligatorias (PostgreSQL + API).
+4. Garantiza esquema y constraints.
+5. Carga datos de prueba reproducibles.
+6. Consolida fuentes con ETL idempotente.
+7. Ejecuta lote pequeño de IA estructurada.
+8. Muestra consumo real de tokens/modelo.
+9. Lleva el sistema a estado de demo (`final_pending_analysis=0`).
+10. Cierra con evidencia de tests en verde.
+
+### EN
+Run these exact 10 commands in order:
+1. `cp .env.example .env`
+2. `uv sync --extra dev`
+3. `docker compose up -d postgres reviews_api`
+4. `uv run alembic upgrade head`
+5. `uv run python -m src.main seed --total 220`
+6. `uv run python -m src.main etl`
+7. `uv run python -m src.main analyze --limit 3`
+8. `uv run python -m src.main llm-usage --since-hours 24`
+9. `uv run python -m src.main prep-demo --batch-size 100 --max-batches 20 --clean-dead-letters true`
+10. `uv run pytest -q`
+
+What each command validates:
+1. Reproducible baseline environment.
+2. Dependency/tooling consistency.
+3. Required sources are online (PostgreSQL + API).
+4. Schema and constraints are applied.
+5. Reproducible seed data is loaded.
+6. Idempotent ETL consolidation works.
+7. Small structured LLM batch executes.
+8. Real token/model usage is visible.
+9. System reaches demo-ready target state (`final_pending_analysis=0`).
+10. Automated tests pass as final gate.
+
+### Local fallback when Docker is unavailable
+If Docker is not available, use this replacement for command 3:
+- `export DATABASE_URL=sqlite:///./feedbackiq.db`
+- Run API locally: `uv run uvicorn src.api.app:app --host 127.0.0.1 --port 8081`
+- Continue with commands 4..10 in a second terminal.
+
 ## One-command demo launcher (macOS + Windows Git Bash)
 - Make sure `.env` exists (`cp .env.example .env`) and `uv` is installed.
 - Run:
