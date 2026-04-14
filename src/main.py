@@ -8,7 +8,17 @@ from src.analysis.llm_analyzer import analyze_pending_reviews
 from src.core.db import session_scope
 from src.etl.pipeline import run_etl
 from src.reports.weekly_report import generate_weekly_report
+from src.scripts.prep_demo import run_prep_demo, stats_to_json
 from src.scripts.seed import seed_customer_surveys
+
+
+def _str_to_bool(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError("Expected boolean value: true/false")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_all_parser = subparsers.add_parser("run-all", help="Run ETL -> analysis -> alerts -> report")
     run_all_parser.add_argument("--analyze-limit", type=int, default=100)
+
+    prep_demo_parser = subparsers.add_parser("prep-demo", help="Prepare deterministic demo readiness state")
+    prep_demo_parser.add_argument("--batch-size", type=int, default=100)
+    prep_demo_parser.add_argument("--max-batches", type=int, default=20)
+    prep_demo_parser.add_argument("--clean-dead-letters", type=_str_to_bool, default=True)
 
     return parser
 
@@ -94,6 +109,16 @@ def cmd_run_all(analyze_limit: int) -> None:
     cmd_report(week_start=None)
 
 
+def cmd_prep_demo(batch_size: int, max_batches: int, clean_dead_letters: bool) -> None:
+    stats = run_prep_demo(
+        batch_size=batch_size,
+        max_batches=max_batches,
+        clean_dead_letters=clean_dead_letters,
+    )
+    print("Prep demo complete:")
+    print(stats_to_json(stats))
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -120,6 +145,14 @@ def main() -> None:
 
     if args.command == "run-all":
         cmd_run_all(analyze_limit=args.analyze_limit)
+        return
+
+    if args.command == "prep-demo":
+        cmd_prep_demo(
+            batch_size=args.batch_size,
+            max_batches=args.max_batches,
+            clean_dead_letters=args.clean_dead_letters,
+        )
         return
 
     raise ValueError(f"Unsupported command: {args.command}")
